@@ -63,6 +63,25 @@ Install dependencies for both the backend (Python 3.10+) and frontend (Node.js 1
 
 ---
 
+## Testing & CI
+
+The adaptive engine — grading, mastery EMA, question selection and the
+prerequisite-aware learning path — is covered by a backend test suite. The tests
+run **fully offline** (AI calls are forced off and an in-memory SQLite database is
+used), so no API keys, network or local `.db` file are needed.
+
+```bash
+cd backend
+python -m venv .venv && . .venv/bin/activate     # Windows: .venv\Scripts\activate
+pip install -r requirements-dev.txt
+pytest
+```
+
+GitHub Actions (`.github/workflows/ci.yml`) runs these tests and a frontend
+type-check + build on every push and pull request.
+
+---
+
 ## License
 
 MIT — see [LICENSE](LICENSE) for details.
