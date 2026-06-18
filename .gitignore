@@ -1,0 +1,19 @@
+# OS
+.DS_Store
+*.pem
+
+# Repo-wide env (also covered in backend/ and frontend/ .gitignore)
+.env
+.env*.local
+
+# Frontend — see frontend/.gitignore
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+frontend/.vercel
+
+# Backend — see backend/.gitignore
+backend/.venv/
+backend/venv/
+backend/__pycache__/
+backend/*.db

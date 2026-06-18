@@ -1,0 +1,16 @@
+# Versions use lower bounds so pip selects wheels compatible with the
+# installed Python (including 3.14). Pure-Python deps stay light.
+fastapi>=0.115
+uvicorn[standard]>=0.34
+SQLAlchemy>=2.0.36
+psycopg[binary]>=3.2
+psycopg2-binary>=2.9
+pydantic[email]>=2.11
+pydantic-settings>=2.7
+PyJWT>=2.9
+bcrypt>=4.2
+httpx>=0.27
+openai>=1.0
+python-dotenv>=1.0
+python-multipart>=0.0.20
+gunicorn>=23.0
