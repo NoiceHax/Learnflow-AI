@@ -85,6 +85,6 @@ remediation, and plain-language AI recommendations.
 - **Learning path** respects prerequisites (topological order); weak chapters come first,
   strong chapters can be skipped. Two students with different assessments get different paths.
 - **Ask Socrates** never reveals the answer outright. It guides with one leading question at a
-  time, keeps session history, and uses Gemini 2.5 Flash (or the built-in Socratic fallback).
+  time, keeps session history, and uses Gemini 2.5 Flash (or the built-in Socratic fallback) .    
 
 ---
