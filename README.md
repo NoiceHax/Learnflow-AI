@@ -1,90 +1,74 @@
-# Astra: AI Learning Platform for JEE Advanced
+<div align="center">
 
-Astra is a production-quality AI learning platform for Grade 12 students preparing for
-**JEE Advanced**, covering Organic Chemistry, Inorganic Chemistry, Advanced Physics and
-Advanced Mathematics. It builds a personalised learning path from an initial assessment,
-teaches with premium lesson material, sharpens weak spots with adaptive quizzes, and offers
-**Ask Socrates**, an AI tutor that guides with questions instead of handing over answers.
+# Astra
+### AI Learning Platform for JEE Advanced
 
-> The AI tutor is **Socrates**. In the product it is always surfaced as **"Ask Socrates"**.
+**Adaptive learning paths · Concept-level mastery · Socratic AI tutor**
 
----
+[![Next.js](https://img.shields.io/badge/Next.js_15-000000?style=flat-square&logo=nextdotjs&logoColor=white)](https://nextjs.org/)
+[![FastAPI](https://img.shields.io/badge/FastAPI-009688?style=flat-square&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?style=flat-square&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![Gemini](https://img.shields.io/badge/Gemini_2.5_Flash-8E75B2?style=flat-square&logo=google&logoColor=white)](https://deepmind.google/technologies/gemini/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](LICENSE)
 
-## Tech stack
-
-| Layer     | Technology |
-|-----------|-----------|
-| Frontend  | Next.js 15 (App Router), TypeScript, TailwindCSS, shadcn/ui, Recharts |
-| Backend   | FastAPI, SQLAlchemy |
-| Database  | SQLite by default · swappable to **Supabase PostgreSQL** via `DATABASE_URL` |
-| Auth      | JWT (email + password) |
-| AI        | **Gemini 2.5 Flash** (with a built-in Socratic fallback if no key is set) |
-
-The app runs fully offline with zero external setup. Add a Gemini key and/or a Supabase
-connection string to upgrade. No code changes required.
+</div>
 
 ---
 
-## Project layout
+Astra is a production-quality AI learning platform for Grade 12 students preparing for JEE Advanced, covering Organic Chemistry, Inorganic Chemistry, Advanced Physics, and Advanced Mathematics.
 
-```
-Learnflow-AI/
-├── backend/                 FastAPI app
-│   └── app/
-│       ├── main.py          app entrypoint + router wiring
-│       ├── models.py        SQLAlchemy schema (10 tables from the spec)
-│       ├── routers/         auth, catalog, quiz, assessment, learning_path,
-│       │                    lessons, mastery, dashboard, socrates
-│       ├── services/        grading · selection (adaptive) · mastery (+concepts) ·
-│       │                    concepts (prereq graph) · intelligence (command center) ·
-│       │                    learning_path · gemini
-│       └── seed/            real JEE catalog, 128-question bank, 31 premium lessons
-└── frontend/                Next.js app
-    ├── app/
-    │   ├── (app)/           dashboard (command center), lessons, analytics
-    │   └── exam/            immersive exam mode: assessment, quiz/[id]
-    ├── middleware.ts        host-based routing for the exam.* subdomain
-    ├── components/          quiz-engine, socrates-widget (floating), exam-shell,
-    │                        charts, app-shell, shadcn/ui primitives
-    └── lib/                 api client, auth context, types
-```
----
-
-### The core flow
-
-```
-Sign up → Initial Assessment (exam mode) → Knowledge Profile
-        → Dashboard command center ⇄ Lessons ⇄ Practice (exam mode)
-        → Diagnose → Fix foundations → Advance   (the system decides what's next)
-```
-
-The student never hand-builds a path. The **Dashboard is the command center**. It
-surfaces what to continue, what's recommended next (prerequisite-aware), weak areas
-ranked by how much they block, a spaced-repetition revision queue, recursive
-remediation, and plain-language AI recommendations.
-
-#### What's adaptive (V2)
-
-- **Concept mastery (EMA)** is tracked per concept, not just per chapter.
-- **Adaptive question engine**: poor performance leads to easier questions + prerequisite
-  concepts; strong → harder, advanced, multi-concept. Plus spaced repetition,
-  weak-concept reinforcement and concept-coverage balancing. Two students get
-  different sequences.
-- **Recursive curriculum**: when a concept keeps failing, the prerequisite graph
-  decomposes it into fundamentals (e.g. *Gauss's Law → Electric Flux → Vector Area →
-  Dot Product*) and recommends teaching those first, then climbing back up.
-- **Contextual Socrates**: a floating tutor on every learning page that already
-  knows your subject, chapter, formulas and examples on screen.
-- **Analytics interpretations**: every metric comes with what to do next.
-
-- **Reusable Quiz Engine** powers both the initial assessment and chapter quizzes
-  (single/multiple correct, integer, numerical; timer, mark-for-review, palette, instant
-  evaluation and weak-topic detection).
-- **Adaptive mastery** updates after every quiz (EMA of performance); ≥80% moves you forward,
-  <60% resurfaces the topic with extra practice.
-- **Learning path** respects prerequisites (topological order); weak chapters come first,
-  strong chapters can be skipped. Two students with different assessments get different paths.
-- **Ask Socrates** never reveals the answer outright. It guides with one leading question at a
-  time, keeps session history, and uses Gemini 2.5 Flash (or the built-in Socratic fallback) .    
+It builds a personalised learning path from an initial assessment, teaches with premium lesson material, sharpens weak spots with adaptive quizzes, and offers **Ask Socrates** — an AI tutor that guides with questions instead of handing over answers.
 
 ---
+
+## How It Works
+
+Sign up → take an initial assessment → Astra builds your knowledge profile. From there, the dashboard becomes your command center: it surfaces what to study next, what's blocking your progress, and what you've forgotten and need to revisit. You never hand-build your path — the system decides based on where you actually are, not where the syllabus says you should be.
+
+---
+
+## Key Features
+
+**Adaptive Learning Engine** — Mastery is tracked per concept using Exponential Moving Averages. Strong performance unlocks harder material; poor performance surfaces easier questions and prerequisite concepts. ≥ 80% moves you forward, < 60% resurfaces the topic with extra practice.
+
+**Recursive Remediation** — When a concept keeps failing, the prerequisite graph decomposes it into its foundations (e.g. *Gauss's Law → Electric Flux → Vector Area → Dot Product*) and recommends teaching those first.
+
+**Ask Socrates** — A floating AI tutor on every lesson page, aware of the subject, chapter, and content on screen. It never reveals the answer — it asks one leading question at a time and guides you to the insight yourself. Powered by Gemini 2.5 Flash with a built-in fallback if no key is set.
+
+**Adaptive Quiz Engine** — Supports single correct, multiple correct, integer, and numerical question types with a timer, mark-for-review, and instant evaluation. Powers both the initial assessment and chapter practice.
+
+**Spaced Repetition** — Concepts you've learned are resurfaced at calibrated intervals before you forget them.
+
+**Premium Lesson Library** — 31 premium lessons across all four subjects, tightly coupled to the concept graph.
+
+---
+
+## Tech Stack
+
+| Layer | Technology |
+|---|---|
+| Frontend | Next.js 15, TypeScript, TailwindCSS, shadcn/ui, Recharts |
+| Backend | FastAPI, SQLAlchemy |
+| Database | SQLite (default) · Supabase PostgreSQL via `DATABASE_URL` |
+| Auth | JWT (email + password) |
+| AI | Gemini 2.5 Flash · built-in Socratic fallback |
+
+The app runs fully offline with zero external setup. Add a Gemini key and/or a Supabase connection string to upgrade — no code changes required.
+
+---
+
+## Getting Started
+
+Install dependencies for both the backend (Python 3.10+) and frontend (Node.js 18+), seed the database, and run both servers. The full setup instructions are in [`SETUP.md`](SETUP.md).
+
+---
+
+## License
+
+MIT — see [LICENSE](LICENSE) for details.
+
+---
+
+<div align="center">
+<i>Built for students who don't leave anything on the table.</i>
+</div>
