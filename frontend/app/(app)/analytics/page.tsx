@@ -10,13 +10,18 @@ import {
   AlertTriangle,
   Trophy,
   Lightbulb,
+  History,
+  ClipboardCheck,
+  BookOpenCheck,
 } from "lucide-react";
 import { ChapterRadar, MasteryBars } from "@/components/charts";
 import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { ExamHistoryReportModal } from "@/components/exam-history-report";
 import { PageSkeleton } from "@/components/page-skeleton";
 import { api } from "@/lib/api";
 import { cn, masteryColor, masteryLabel } from "@/lib/utils";
-import type { Dashboard } from "@/lib/types";
+import type { Dashboard, ExamHistoryItem } from "@/lib/types";
 
 function sample<T>(arr: T[], n: number): T[] {
   if (arr.length <= n) return arr;
@@ -26,12 +31,14 @@ function sample<T>(arr: T[], n: number): T[] {
 
 export default function AnalyticsPage() {
   const [data, setData] = useState<Dashboard | null>(null);
+  const [history, setHistory] = useState<ExamHistoryItem[] | null>(null);
 
   useEffect(() => {
     api.dashboard().then(setData);
+    api.examHistory().then(setHistory);
   }, []);
 
-  if (!data) {
+  if (!data || history === null) {
     return <PageSkeleton variant="analytics" />;
   }
 
@@ -110,6 +117,8 @@ export default function AnalyticsPage() {
         <RankedList title="Weak Topics" icon={AlertTriangle} tone="warning" items={data.weak_topics} empty="No weak topics." />
         <RankedList title="Strong Topics" icon={Trophy} tone="success" items={data.strong_topics} empty="No mastered topics yet." />
       </div>
+
+      <ExamHistorySection items={history} />
     </div>
   );
 }
@@ -177,5 +186,116 @@ function RankedList({
         )}
       </CardContent>
     </Card>
+  );
+}
+
+function formatDuration(seconds: number | null): string {
+  if (seconds == null || seconds <= 0) return "—";
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  if (m === 0) return `${s}s`;
+  return `${m}m ${s}s`;
+}
+
+function formatWhen(iso: string): string {
+  const d = new Date(iso);
+  return d.toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+function ExamHistorySection({ items }: { items: ExamHistoryItem[] }) {
+  const [selected, setSelected] = useState<ExamHistoryItem | null>(null);
+
+  return (
+    <>
+      <Card>
+        <CardContent className="space-y-4 p-6">
+          <div className="flex items-center gap-2">
+            <History className="size-4 text-primary" />
+            <h2 className="font-semibold">Completed Exams</h2>
+          </div>
+          <p className="text-sm text-muted-foreground">
+            Your initial assessment and final chapter quizzes. Click a row to open the full report.
+          </p>
+        {items.length === 0 ? (
+          <p className="text-sm text-muted-foreground">
+            No completed exams yet. Finish the assessment or pass a final chapter quiz to see history here.
+          </p>
+        ) : (
+          <div className="overflow-x-auto rounded-lg border">
+            <table className="w-full min-w-[640px] text-left text-sm">
+              <thead className="border-b bg-secondary/40 text-xs text-muted-foreground">
+                <tr>
+                  <th className="px-4 py-3 font-medium">Date</th>
+                  <th className="px-4 py-3 font-medium">Exam</th>
+                  <th className="px-4 py-3 font-medium">Result</th>
+                  <th className="px-4 py-3 font-medium">Score</th>
+                  <th className="px-4 py-3 font-medium">Time</th>
+                </tr>
+              </thead>
+              <tbody>
+                {items.map((row) => (
+                  <tr
+                    key={`${row.kind}-${row.id}`}
+                    className="cursor-pointer border-b transition-colors last:border-0 hover:bg-secondary/40"
+                    onClick={() => setSelected(row)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        setSelected(row);
+                      }
+                    }}
+                    tabIndex={0}
+                    role="button"
+                    aria-label={`View report for ${row.title}`}
+                  >
+                    <td className="px-4 py-3 tabular-nums text-muted-foreground">{formatWhen(row.timestamp)}</td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-2">
+                        {row.kind === "assessment" ? (
+                          <ClipboardCheck className="size-4 shrink-0 text-primary" />
+                        ) : (
+                          <BookOpenCheck className="size-4 shrink-0 text-primary" />
+                        )}
+                        <div className="min-w-0">
+                          <div className="font-medium">{row.title}</div>
+                          {row.subject && (
+                            <div className="truncate text-xs text-muted-foreground">{row.subject}</div>
+                          )}
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className="text-muted-foreground">
+                        {row.correct_count}/{row.total_questions} correct
+                      </span>
+                      {row.kind === "final_quiz" && row.passed != null && (
+                        <Badge
+                          variant={row.passed ? "default" : "secondary"}
+                          className="ml-2 align-middle text-[10px]"
+                        >
+                          {row.passed ? "Passed" : "Retry"}
+                        </Badge>
+                      )}
+                    </td>
+                    <td className={cn("px-4 py-3 font-semibold tabular-nums", masteryColor(row.score))}>
+                      {row.score}%
+                    </td>
+                    <td className="px-4 py-3 tabular-nums text-muted-foreground">{formatDuration(row.time_taken)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+        </CardContent>
+      </Card>
+      <ExamHistoryReportModal item={selected} onClose={() => setSelected(null)} />
+    </>
   );
 }

@@ -9,7 +9,7 @@ from ..database import get_db
 from ..deps import get_current_user
 from ..models import ChatMessage, User
 from ..schemas import ChatRequest, ChatResponse, ChatTurn
-from ..services.gemini import ask_socrates
+from ..services.llm import ask_socrates
 
 router = APIRouter(prefix="/socrates", tags=["socrates"])
 

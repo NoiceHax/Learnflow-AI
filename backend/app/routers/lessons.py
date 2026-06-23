@@ -6,6 +6,7 @@ from ..database import get_db
 from ..deps import get_current_user
 from ..models import Chapter, Lesson, User
 from ..schemas import LessonOut
+from ..services.pilot import assert_pilot_chapter_access
 
 router = APIRouter(prefix="/lessons", tags=["lessons"])
 
@@ -19,6 +20,7 @@ def get_lesson(
     chapter = db.get(Chapter, chapter_id)
     if chapter is None:
         raise HTTPException(404, "Chapter not found")
+    assert_pilot_chapter_access(db, chapter_id)
     lesson = db.query(Lesson).filter(Lesson.chapter_id == chapter_id).first()
     if lesson is None:
         raise HTTPException(404, "Lesson not available for this chapter yet.")

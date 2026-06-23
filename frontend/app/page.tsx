@@ -35,10 +35,10 @@ export default function LandingPage() {
         <div className="lf-wide">
           <Brand />
           <div className="lf-row" style={{ gap: 12 }}>
-            <Link href="/login" className="navlink">
+            <Link href="/login?mode=signin" className="navlink">
               Sign in
             </Link>
-            <Link href="/login" className="btn btn-solid btn-sm">
+            <Link href="/login?mode=signup" className="btn btn-solid btn-sm">
               Get started
             </Link>
           </div>
@@ -62,10 +62,10 @@ export default function LandingPage() {
             material, and repairs weak foundations, guided every step by Socrates.
           </p>
           <div className="lf-row" style={{ gap: 12, justifyContent: "center", marginTop: 34, flexWrap: "wrap" }}>
-            <Link href="/login" className="btn btn-solid btn-lg">
+            <Link href="/login?mode=signup" className="btn btn-solid btn-lg">
               Start your assessment <ArrowRight size={16} />
             </Link>
-            <Link href="/login" className="btn btn-quiet btn-lg">
+            <Link href="/login?mode=signin" className="btn btn-quiet btn-lg">
               Sign in
             </Link>
           </div>

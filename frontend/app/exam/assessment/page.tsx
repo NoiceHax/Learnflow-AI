@@ -2,17 +2,15 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { ClipboardCheck, ArrowRight, Sparkles } from "lucide-react";
-import { MasteryBars } from "@/components/charts";
+import { ClipboardCheck, Sparkles } from "lucide-react";
+import { KnowledgeProfile } from "@/components/knowledge-profile";
 import { QuizEngine } from "@/components/quiz-engine";
 import { QuizSkeleton } from "@/components/page-skeleton";
 import { enterFullscreen } from "@/components/exam-shell";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { api, ApiError } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
-import { cn } from "@/lib/utils";
 import type { AnswerValue, AssessmentResult, Question } from "@/lib/types";
 
 type Stage = "intro" | "loading" | "quiz" | "submitting" | "result";
@@ -26,10 +24,11 @@ export default function ExamAssessmentPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (user?.onboarded) {
+    // Already onboarded — skip assessment, unless we're showing the post-submit profile.
+    if (user?.onboarded && stage !== "result" && stage !== "submitting") {
       router.replace("/dashboard");
     }
-  }, [user, router]);
+  }, [user, router, stage]);
 
   async function start() {
     setStage("loading");
@@ -51,7 +50,6 @@ export default function ExamAssessmentPage() {
     try {
       const res = await api.submitAssessment(answers, timeTaken);
       setResult(res);
-      await refresh();
       setStage("result");
     } catch (e) {
       setError(e instanceof ApiError ? e.message : "Could not submit the assessment.");
@@ -107,79 +105,13 @@ export default function ExamAssessmentPage() {
     );
   }
 
-  return <KnowledgeProfile result={result!} onContinue={() => router.push("/dashboard")} />;
-}
-
-function KnowledgeProfile({ result, onContinue }: { result: AssessmentResult; onContinue: () => void }) {
-  const subjectData = Object.entries(result.subject_scores).map(([slug, mastery]) => ({
-    label: slugLabel(slug),
-    mastery,
-  }));
-  const sortedMap = [...result.knowledge_map].sort((a, b) => a.score - b.score);
-
   return (
-    <div className="mx-auto max-w-3xl space-y-6">
-      <div className="text-center">
-        <Badge variant="default" className="mb-2">
-          Knowledge Profile
-        </Badge>
-        <h1 className="text-3xl font-bold tracking-tight">
-          You scored <span className="text-primary">{result.score}%</span>
-        </h1>
-        <p className="mt-2 text-muted-foreground">
-          {result.correct_count} of {result.total_questions} correct. Your personalised plan is ready on
-          the dashboard.
-        </p>
-      </div>
-
-      <Card>
-        <CardContent className="space-y-4 p-6">
-          <h2 className="font-semibold">Mastery by subject</h2>
-          <MasteryBars data={subjectData} />
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardContent className="space-y-4 p-6">
-          <h2 className="font-semibold">Chapter knowledge map</h2>
-          <div className="flex flex-wrap gap-2">
-            {sortedMap.map((c) => (
-              <span
-                key={c.slug}
-                className={cn(
-                  "rounded-full border px-3 py-1 text-xs font-medium",
-                  c.score >= 80
-                    ? "border-success/40 bg-success/10 text-success"
-                    : c.score >= 60
-                      ? "border-primary/40 bg-primary/10 text-primary"
-                      : c.score >= 40
-                        ? "border-amber-500/40 bg-amber-500/10 text-amber-600 dark:text-amber-400"
-                        : "border-destructive/40 bg-destructive/10 text-destructive"
-                )}
-              >
-                {c.chapter} · {c.score}%
-              </span>
-            ))}
-          </div>
-          <p className="text-xs text-muted-foreground">
-            Weak chapters are prioritised on your dashboard with extra practice; the system decides what
-            to teach next.
-          </p>
-        </CardContent>
-      </Card>
-
-      <div className="flex justify-center">
-        <Button size="lg" onClick={onContinue}>
-          Go to my dashboard <ArrowRight className="size-4" />
-        </Button>
-      </div>
-    </div>
+    <KnowledgeProfile
+      result={result!}
+      onContinue={async () => {
+        await refresh();
+        router.push("/dashboard");
+      }}
+    />
   );
-}
-
-function slugLabel(slug: string): string {
-  return slug
-    .split("-")
-    .map((w) => w[0].toUpperCase() + w.slice(1))
-    .join(" ");
 }

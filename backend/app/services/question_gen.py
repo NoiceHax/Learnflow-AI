@@ -1,4 +1,4 @@
-"""Persist Gemini-generated questions and blend them into quiz/assessment selection."""
+"""Persist LLM-generated questions and blend them into quiz/assessment selection."""
 from __future__ import annotations
 
 import logging
@@ -8,7 +8,8 @@ from sqlalchemy import not_
 from sqlalchemy.orm import Session
 
 from ..models import Chapter, Question, Subject
-from .gemini import gemini_enabled, generate_questions
+from ..database import release_db_transaction
+from .llm import ai_enabled, generate_questions
 
 logger = logging.getLogger(__name__)
 
@@ -19,7 +20,7 @@ def _is_ai(q: Question) -> bool:
     return q.concept.startswith(AI_CONCEPT_PREFIX)
 
 
-def trim_old_ai(db: Session, chapter_id: str, keep: int = 40) -> None:
+def trim_old_ai(db: Session, chapter_id: str, keep: int = 80) -> None:
     rows = (
         db.query(Question)
         .filter(Question.chapter_id == chapter_id, Question.concept.like(f"{AI_CONCEPT_PREFIX}%"))
@@ -78,9 +79,11 @@ def generate_for_chapter(
     concepts: list[str],
     user_id: str | None = None,
     exclude_question_ids: set[str] | None = None,
+    allow_live_api: bool = True,
+    fresh_for_practice: bool = False,
 ) -> list[Question]:
-    """Generate and persist fresh AI questions for a chapter. Returns [] if Gemini disabled."""
-    if not gemini_enabled() or count < 1:
+    """Return AI questions for a chapter. Uses DB cache first; live LLM only if ``allow_live_api``."""
+    if not ai_enabled() or count < 1:
         return []
 
     subject = db.get(Subject, chapter.subject_id)
@@ -90,6 +93,7 @@ def generate_for_chapter(
     exclude: list[str] = []
     blocked: set[str] = set(exclude_question_ids or ())
     pool = db.query(Question).filter(Question.chapter_id == chapter.id).all()
+    cache_retired = blocked
     if user_id:
         from ..models import UserQuestionState
 
@@ -98,14 +102,24 @@ def generate_for_chapter(
             .filter(UserQuestionState.user_id == user_id, UserQuestionState.chapter_id == chapter.id)
             .all()
         )
-        seen = {r.question_id for r in states if (r.seen_count or 0) > 0}
-        retired = {r.question_id for r in states if r.retired}
-        blocked |= seen | retired
-        exclude = [q.prompt for q in pool if q.id in blocked]
+        if fresh_for_practice:
+            cleared = {r.question_id for r in states if r.last_correct is True}
+            attempted = {r.question_id for r in states if (r.seen_count or 0) > 0}
+            blocked = cleared | attempted | blocked
+            cache_retired = blocked
+            exclude = list({q.prompt for q in pool if q.id in blocked})
+        else:
+            seen = {r.question_id for r in states if (r.seen_count or 0) > 0}
+            retired = {r.question_id for r in states if r.retired}
+            blocked |= seen | retired
+            cache_retired = blocked
+            exclude = [q.prompt for q in pool if q.id in blocked]
     else:
-        exclude = [q.prompt for q in pool if not _is_ai(q)][:12]
+        seed_exclude = [q.prompt for q in pool if not _is_ai(q)][:6]
+        recent_ai = [q.prompt for q in pool if _is_ai(q)][-4:]
+        exclude = seed_exclude + recent_ai
 
-    from .gemini_cache import fetch_db_question_cache
+    from .llm_cache import fetch_db_question_cache
 
     cached = fetch_db_question_cache(
         db,
@@ -114,17 +128,35 @@ def generate_for_chapter(
         concepts=concepts,
         count=count,
         exclude_prompts=set(exclude),
-        retired_ids=blocked,
+        retired_ids=cache_retired,
     )
     cached = [q for q in cached if q.id not in blocked]
     if len(cached) >= count:
         logger.info("Reused %d cached AI question(s) for chapter %s", len(cached[:count]), chapter.slug)
         return cached[:count]
 
+    if not allow_live_api:
+        if cached:
+            logger.info(
+                "DB-only mode: returning %d cached AI question(s) for chapter %s (wanted %d)",
+                len(cached),
+                chapter.slug,
+                count,
+            )
+        return cached
+
+    # Snapshot for the API call — release DB so Neon does not idle-in-transaction timeout.
+    subject_name = subject.name
+    chapter_name = chapter.chapter_name
+    chapter_description = chapter.description or ""
+    chapter_id = chapter.id
+    subject_id = subject.id
+    release_db_transaction(db)
+
     raw, err = generate_questions(
-        subject_name=subject.name,
-        chapter_name=chapter.chapter_name,
-        chapter_description=chapter.description or "",
+        subject_name=subject_name,
+        chapter_name=chapter_name,
+        chapter_description=chapter_description,
         difficulty=difficulty,
         concepts=concepts,
         count=count,
@@ -132,6 +164,11 @@ def generate_for_chapter(
     )
     if err:
         logger.warning("AI question generation failed for %s: %s", chapter.slug, err)
+        return cached
+
+    subject = db.get(Subject, subject_id)
+    chapter = db.get(Chapter, chapter_id)
+    if chapter is None or subject is None:
         return cached
 
     trim_old_ai(db, chapter.id)
@@ -154,7 +191,7 @@ def blend_ai_questions(
     weak_concepts: list[str] | None = None,
 ) -> list[Question]:
     """Replace part of the static selection with freshly generated AI questions."""
-    if not gemini_enabled():
+    if not ai_enabled():
         return selected
 
     ai_count = 2 if effective_mastery < 75 else 1

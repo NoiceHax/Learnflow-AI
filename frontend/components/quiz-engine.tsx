@@ -170,7 +170,24 @@ export function QuizEngine({ questions, title, subtitle, submitLabel = "Submit",
             </div>
           </div>
         ) : (
-          <div className="surface pad-l fade-in">
+          <div className="surface pad-l fade-in" style={{ position: "relative" }}>
+            {submitting && (
+              <div
+                style={{
+                  position: "absolute",
+                  inset: 0,
+                  zIndex: 10,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  borderRadius: "inherit",
+                  background: "color-mix(in srgb, var(--bg) 72%, transparent)",
+                  backdropFilter: "blur(4px)",
+                }}
+              >
+                <Loader2 size={28} className="animate-spin" style={{ color: "var(--indigo-bright)" }} />
+              </div>
+            )}
             <h2 className="title">Review &amp; submit</h2>
             <div className="stack-16" style={{ marginTop: 20 }}>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 12 }}>

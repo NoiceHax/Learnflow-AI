@@ -1,26 +1,34 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useEffect, useState } from "react";
 import { Loader2 } from "lucide-react";
 import { Brand } from "@/components/brand";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/lib/auth";
 
-export default function LoginPage() {
+function LoginForm() {
   const { user, loading, login, signup } = useAuth();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [tab, setTab] = useState("signin");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    const mode = searchParams.get("mode");
+    if (mode === "signup" || mode === "signin") {
+      setTab(mode);
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     if (!loading && user) {
@@ -31,9 +39,34 @@ export default function LoginPage() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+
+    const trimmedEmail = email.trim();
+    const trimmedPassword = password.trim();
+    const trimmedName = name.trim();
+
+    if (!trimmedEmail) {
+      setError("Please enter your email address.");
+      return;
+    }
+    if (!trimmedPassword) {
+      setError("Please enter your password.");
+      return;
+    }
+    if (trimmedPassword.length < 6) {
+      setError("Password must be at least 6 characters.");
+      return;
+    }
+    if (tab === "signup" && !trimmedName) {
+      setError("Please enter your full name.");
+      return;
+    }
+
     setBusy(true);
     try {
-      const u = tab === "signin" ? await login(email, password) : await signup(name, email, password);
+      const u =
+        tab === "signin"
+          ? await login(trimmedEmail, trimmedPassword)
+          : await signup(trimmedName, trimmedEmail, trimmedPassword);
       router.replace(u.onboarded ? "/dashboard" : "/exam/assessment");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong.");
@@ -81,16 +114,19 @@ export default function LoginPage() {
               </div>
 
               <form onSubmit={handleSubmit} className="mt-5 space-y-4">
-                <TabsContent value="signup" className="mt-0 space-y-2">
-                  <Label htmlFor="name">Full name</Label>
-                  <Input
-                    id="name"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    placeholder="Aarav Sharma"
-                    required={tab === "signup"}
-                  />
-                </TabsContent>
+                {tab === "signup" && (
+                  <div className="space-y-2">
+                    <Label htmlFor="name">Full name</Label>
+                    <Input
+                      id="name"
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      placeholder="Aarav Sharma"
+                      autoComplete="name"
+                      required
+                    />
+                  </div>
+                )}
 
                 <div className="space-y-2">
                   <Label htmlFor="email">Email</Label>
@@ -134,5 +170,22 @@ export default function LoginPage() {
         </p>
       </div>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="relative flex min-h-screen items-center justify-center px-4">
+          <div className="w-full max-w-md stack-16">
+            <div className="skel" style={{ height: 32, width: 160, margin: "0 auto", borderRadius: 8 }} />
+            <div className="skel" style={{ height: 380, borderRadius: 12 }} />
+          </div>
+        </div>
+      }
+    >
+      <LoginForm />
+    </Suspense>
   );
 }

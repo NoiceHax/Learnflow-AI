@@ -14,6 +14,7 @@ export interface Chapter {
   order_index: number;
   jee_weightage: number;
   description: string;
+  unlocked?: boolean;
 }
 
 export interface Subject {
@@ -123,6 +124,30 @@ export interface Lesson {
     pyq_highlights: string[];
     practice: { easy: string; medium: string; advanced: string };
   };
+}
+
+export interface ExamHistoryItem {
+  kind: "assessment" | "final_quiz";
+  id: string;
+  title: string;
+  chapter: string | null;
+  chapter_id: string | null;
+  subject: string | null;
+  score: number;
+  accuracy: number;
+  correct_count: number;
+  total_questions: number;
+  time_taken: number | null;
+  passed: boolean | null;
+  timestamp: string;
+}
+
+export interface ExamReport {
+  kind: "assessment" | "final_quiz";
+  assessment: AssessmentResult | null;
+  quiz_result: QuizResult | null;
+  questions: Question[] | null;
+  detail_available: boolean;
 }
 
 export interface ActivityItem {
@@ -292,3 +317,5 @@ export interface ChatSession {
   last_at: string;
   turns: number;
 }
+
+export const MIN_QUIZ_QUESTIONS = 4;

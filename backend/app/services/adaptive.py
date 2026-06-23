@@ -9,8 +9,11 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
-from ..models import Chapter, ConceptMastery, Question, Subject, UserQuestionState
-from .gemini import gemini_enabled, generate_questions
+from ..models import Chapter, ConceptMastery, Mastery, Question, Subject, UserQuestionState
+from ..config import settings
+from ..database import release_db_transaction
+from .llm import ai_enabled, generate_questions
+from .quiz_rules import accept_quiz_questions
 from .question_gen import AI_CONCEPT_PREFIX, persist_generated, trim_old_ai
 
 logger = logging.getLogger(__name__)
@@ -101,7 +104,7 @@ def _pick_pool_replacements(
     *,
     user_id: str,
 ) -> list[Question]:
-    """DB-only replacement picks. Never calls Gemini (safe for quiz load)."""
+    """DB-only replacement picks. Never calls the LLM (safe for quiz load)."""
     if not references:
         return []
 
@@ -142,6 +145,7 @@ def generate_similar_replacements(
     references: list[Question],
     *,
     user_id: str,
+    allow_live_api: bool = True,
 ) -> list[Question]:
     """Create same-difficulty replacement questions for retired items."""
     if not references:
@@ -164,7 +168,7 @@ def generate_similar_replacements(
         concepts = list({_clean_concept(r.concept) for r in refs})
         ref_payloads = [_reference_payload(r) for r in refs]
 
-        from .gemini_cache import fetch_db_question_cache
+        from .llm_cache import fetch_db_question_cache
 
         cached = fetch_db_question_cache(
             db,
@@ -180,7 +184,8 @@ def generate_similar_replacements(
             exclude.extend(q.prompt for q in cached[: len(refs)])
             continue
 
-        if gemini_enabled():
+        if ai_enabled() and allow_live_api:
+            release_db_transaction(db)
             raw, err = generate_questions(
                 subject_name=subject.name,
                 chapter_name=chapter.chapter_name,
@@ -212,11 +217,17 @@ def replenish_pool(
     user_id: str,
     chapter_id: str,
     retired_questions: list[Question],
+    *,
+    allow_live_api: bool = True,
 ) -> int:
     chapter = db.get(Chapter, chapter_id)
     if chapter is None or not retired_questions:
         return 0
-    return len(generate_similar_replacements(db, chapter, retired_questions, user_id=user_id))
+    return len(
+        generate_similar_replacements(
+            db, chapter, retired_questions, user_id=user_id, allow_live_api=allow_live_api
+        )
+    )
 
 
 def weak_concepts_for_user(db: Session, user_id: str, chapter_id: str) -> list[str]:
@@ -285,7 +296,7 @@ def _ensure_pool_for_user(db: Session, user_id: str, chapter: Chapter) -> list[Q
             logger.info("Replenished adaptive pool: chapter=%s now has %d available", chapter.slug, len(pool))
             return pool
 
-    # Gemini off or chapter too small: recycle retired questions so quizzes never 404
+    # AI off or chapter too small: recycle retired questions so quizzes never 404
     logger.warning(
         "Recycling retired questions: user=%s chapter=%s (no new replacements available)",
         user_id,
@@ -321,7 +332,7 @@ def select_final_quiz(
     effective_mastery: float,
     concept_mastery: dict[str, ConceptMastery],
 ) -> list[Question]:
-    """Fresh final-quiz set: harder difficulty, never reuses practice or prior attempts."""
+    """Fresh final-quiz set from DB only on load — never blocks on live LLM (see submit replenish)."""
     from .question_gen import generate_for_chapter
 
     chapter = db.get(Chapter, chapter_id)
@@ -334,36 +345,13 @@ def select_final_quiz(
 
     weak = weak_concepts_for_user(db, user_id, chapter_id)
     diff = final_quiz_difficulty(effective_mastery)
-    concepts = weak or list({_clean_concept(q.concept) for q in db.query(Question).filter(Question.chapter_id == chapter_id).all()})
+    all_chapter_qs = db.query(Question).filter(Question.chapter_id == chapter_id).all()
+    concepts = weak or list({_clean_concept(q.concept) for q in all_chapter_qs})
     if not concepts:
         concepts = [chapter.chapter_name]
 
-    # Prefer a full freshly generated set (never shown to this user before).
-    if gemini_enabled():
-        fresh = generate_for_chapter(
-            db,
-            chapter,
-            count=count,
-            difficulty=diff,
-            concepts=concepts,
-            user_id=user_id,
-            exclude_question_ids=blocked,
-        )
-        fresh = [q for q in fresh if q.id not in blocked]
-        if len(fresh) >= count:
-            random.shuffle(fresh)
-            fresh.sort(key=lambda q: _DIFF_ORDER.get(q.difficulty, 1), reverse=True)
-            return fresh[:count]
-
-    pool = [
-        q
-        for q in db.query(Question).filter(Question.chapter_id == chapter_id).all()
-        if q.id not in blocked
-    ]
-    if not pool:
-        return []
-
     diff_rank = _DIFF_ORDER.get(diff, 1)
+    pool = [q for q in all_chapter_qs if q.id not in blocked]
     harder = [q for q in pool if _DIFF_ORDER.get(q.difficulty, 1) >= diff_rank]
     candidates = harder or pool
 
@@ -375,9 +363,150 @@ def select_final_quiz(
             base += (100 - cm.ema) / 40
         return base + _DIFF_ORDER.get(q.difficulty, 1) * 0.5 + random.random() * 0.2
 
-    selected = sorted(candidates, key=score, reverse=True)[:count]
-    selected.sort(key=lambda q: _DIFF_ORDER.get(q.difficulty, 1), reverse=True)
-    return selected
+    selected: list[Question] = []
+    seen_ids: set[str] = set()
+    if candidates:
+        picked = sorted(candidates, key=score, reverse=True)[:count]
+        picked.sort(key=lambda q: _DIFF_ORDER.get(q.difficulty, 1), reverse=True)
+        selected = picked
+        seen_ids = {q.id for q in selected}
+
+    # Unseen AI questions already in DB (from prior submit replenishment) — no live API.
+    if len(selected) < count and ai_enabled():
+        need = count - len(selected)
+        cached = generate_for_chapter(
+            db,
+            chapter,
+            count=need,
+            difficulty=diff,
+            concepts=concepts,
+            user_id=user_id,
+            exclude_question_ids=blocked | seen_ids,
+            allow_live_api=False,
+        )
+        for q in cached:
+            if q.id not in seen_ids and q.id not in blocked:
+                selected.append(q)
+                seen_ids.add(q.id)
+            if len(selected) >= count:
+                break
+
+    # Any remaining unseen questions (e.g. easier seed bank) before giving up.
+    if len(selected) < count:
+        remainder = [q for q in pool if q.id not in seen_ids]
+        random.shuffle(remainder)
+        for q in remainder:
+            selected.append(q)
+            seen_ids.add(q.id)
+            if len(selected) >= count:
+                break
+
+    min_q = settings.min_quiz_questions
+    if 0 < len(selected) < min_q and ai_enabled():
+        need = min_q - len(selected)
+        cached = generate_for_chapter(
+            db,
+            chapter,
+            count=need,
+            difficulty=diff,
+            concepts=concepts,
+            user_id=user_id,
+            exclude_question_ids=blocked | seen_ids,
+            allow_live_api=False,
+        )
+        for q in cached:
+            if q.id not in seen_ids and q.id not in blocked:
+                selected.append(q)
+                seen_ids.add(q.id)
+            if len(selected) >= min_q:
+                break
+
+    if selected:
+        return accept_quiz_questions(selected[:count])
+
+    logger.warning(
+        "Final quiz pool empty after DB selection: user=%s chapter=%s blocked=%d",
+        user_id,
+        chapter_id,
+        len(blocked),
+    )
+    return []
+
+
+def _chapter_mastery_ema(db: Session, user_id: str, chapter_id: str) -> float:
+    row = (
+        db.query(Mastery)
+        .filter(Mastery.user_id == user_id, Mastery.chapter_id == chapter_id)
+        .one_or_none()
+    )
+    if row is not None:
+        return float(row.mastery_score)
+    rows = (
+        db.query(ConceptMastery)
+        .filter(ConceptMastery.user_id == user_id, ConceptMastery.chapter_id == chapter_id)
+        .all()
+    )
+    return sum(r.ema for r in rows) / len(rows) if rows else 50.0
+
+
+def cleared_question_ids(db: Session, user_id: str, chapter_id: str) -> set[str]:
+    """Questions the user answered correctly — excluded from future practice rounds."""
+    return {
+        r.question_id
+        for r in db.query(UserQuestionState)
+        .filter(
+            UserQuestionState.user_id == user_id,
+            UserQuestionState.chapter_id == chapter_id,
+            UserQuestionState.last_correct.is_(True),
+        )
+        .all()
+    }
+
+
+def top_up_practice_pool(
+    db: Session,
+    user_id: str,
+    chapter_id: str,
+    need: int,
+    *,
+    allow_live_api: bool = True,
+    exclude_ids: set[str] | None = None,
+) -> list[Question]:
+    """Generate fresh AI questions when the practice pool is smaller than the target size."""
+    if need < 1:
+        return []
+    chapter = db.get(Chapter, chapter_id)
+    if chapter is None:
+        return []
+
+    weak = weak_concepts_for_user(db, user_id, chapter_id)
+    concepts = weak or [chapter.chapter_name]
+    diff = target_difficulty(_chapter_mastery_ema(db, user_id, chapter_id))
+
+    from .question_gen import generate_for_chapter
+
+    blocked = cleared_question_ids(db, user_id, chapter_id) | (exclude_ids or set())
+
+    fresh = generate_for_chapter(
+        db,
+        chapter,
+        count=need,
+        difficulty=diff,
+        concepts=concepts,
+        user_id=user_id,
+        exclude_question_ids=blocked,
+        allow_live_api=allow_live_api,
+        fresh_for_practice=True,
+    )
+    if fresh:
+        logger.info(
+            "Practice pool top-up: user=%s chapter=%s added=%d live=%s",
+            user_id,
+            chapter.slug,
+            len(fresh),
+            allow_live_api,
+        )
+    return fresh
 
 
 def select_practice_quiz(
@@ -386,44 +515,99 @@ def select_practice_quiz(
     chapter_id: str,
     count: int,
 ) -> list[Question]:
-    """Practice quiz: missed questions only; excludes ones already answered correctly."""
-    all_qs = db.query(Question).filter(Question.chapter_id == chapter_id).all()
-    if not all_qs:
+    """Infinite practice: mostly fresh AI; at most one prior miss for reinforcement."""
+    chapter = db.get(Chapter, chapter_id)
+    if chapter is None:
         return []
 
+    all_qs = db.query(Question).filter(Question.chapter_id == chapter_id).all()
     states = {
         r.question_id: r
         for r in db.query(UserQuestionState)
         .filter(UserQuestionState.user_id == user_id, UserQuestionState.chapter_id == chapter_id)
         .all()
     }
+    cleared = cleared_question_ids(db, user_id, chapter_id)
+    max_reinforce = max(0, settings.practice_reinforce_wrong)
 
-    missed: list[tuple[Question, float]] = []
-    unseen: list[Question] = []
+    selected: list[Question] = []
+    selected_ids: set[str] = set()
 
+    # Optional: one recent miss for spaced reinforcement (not the whole stale pile).
+    wrong: list[tuple[Question, float]] = []
     for q in all_qs:
-        row = states.get(q.id)
-        if row is None:
-            unseen.append(q)
-        elif row.last_correct is True:
+        if q.id in cleared:
             continue
-        else:
-            weight = float(row.wrong_count or 0) + (2.0 if row.retired else 0.0)
-            missed.append((q, weight))
+        row = states.get(q.id)
+        if row and row.last_correct is not True and (row.wrong_count or 0) > 0:
+            wrong.append((q, float(row.wrong_count or 0) + (1.0 if row.retired else 0.0)))
+    wrong.sort(key=lambda t: t[1], reverse=True)
+    for q, _ in wrong[:max_reinforce]:
+        selected.append(q)
+        selected_ids.add(q.id)
 
-    if missed:
-        missed.sort(key=lambda t: t[1], reverse=True)
-        pool = [q for q, _ in missed]
-    else:
-        pool = unseen
+    # Unseen seeded / AI rows the user has never attempted.
+    unseen = [q for q in all_qs if q.id not in states and q.id not in cleared]
+    random.shuffle(unseen)
+    for q in unseen:
+        if len(selected) >= count:
+            break
+        if q.id not in selected_ids:
+            selected.append(q)
+            selected_ids.add(q.id)
 
-    if not pool:
-        return []
+    # Top up from DB backup bank; live API only if PRACTICE_LIVE_API_ON_LOAD=true.
+    if len(selected) < count and ai_enabled():
+        need = count - len(selected)
+        extra = top_up_practice_pool(
+            db,
+            user_id,
+            chapter_id,
+            need,
+            allow_live_api=settings.practice_live_api_on_load,
+            exclude_ids=selected_ids | cleared,
+        )
+        for q in extra:
+            if q.id not in selected_ids:
+                selected.append(q)
+                selected_ids.add(q.id)
+            if len(selected) >= count:
+                break
 
-    selected = pool[:count]
-    random.shuffle(selected)
-    selected.sort(key=lambda q: _DIFF_ORDER.get(q.difficulty, 1))
-    return selected
+    min_q = settings.min_quiz_questions
+    if 0 < len(selected) < min_q and ai_enabled():
+        extra = top_up_practice_pool(
+            db,
+            user_id,
+            chapter_id,
+            min_q - len(selected),
+            allow_live_api=settings.practice_live_api_on_load,
+            exclude_ids=selected_ids | cleared,
+        )
+        for q in extra:
+            if q.id not in selected_ids:
+                selected.append(q)
+                selected_ids.add(q.id)
+            if len(selected) >= min_q:
+                break
+
+    if selected and len(selected) >= min_q:
+        random.shuffle(selected)
+        selected.sort(key=lambda q: _DIFF_ORDER.get(q.difficulty, 1))
+        return selected[:count]
+
+    if not all_qs and ai_enabled():
+        fresh = top_up_practice_pool(
+            db,
+            user_id,
+            chapter_id,
+            max(count, min_q),
+            allow_live_api=settings.practice_live_api_on_load,
+            exclude_ids=cleared,
+        )
+        return accept_quiz_questions(fresh[:count])
+
+    return []
 
 
 def process_after_quiz(
@@ -435,12 +619,22 @@ def process_after_quiz(
     *,
     mode: str = "adaptive",
 ) -> dict[str, Any]:
-    """Update per-user question state; adaptive mode also replenishes the pool."""
+    """Update per-user question state; replenish pool after misses (final) or clears (practice)."""
     correct_by_qid = {g["question_id"]: g["correct"] for g in graded}
     retired = record_attempts(db, user_id, questions, correct_by_qid, mode=mode)
     replacements = 0
-    if mode == "final" or mode == "adaptive":
-        replacements = replenish_pool(db, user_id, chapter_id, retired)
+    # Never block submit on live LLM — use DB cache + pool; run pregenerate-backups to fill the bank.
+    live_on_submit = False
+    if mode == "practice":
+        cleared = [q for q in questions if correct_by_qid.get(q.id)]
+        if cleared:
+            replacements = replenish_pool(
+                db, user_id, chapter_id, cleared, allow_live_api=live_on_submit
+            )
+    elif mode == "final" or mode == "adaptive":
+        replacements = replenish_pool(
+            db, user_id, chapter_id, retired, allow_live_api=live_on_submit
+        )
 
     weak = list({g["concept"] for g in graded if not g["correct"]})
     return {
