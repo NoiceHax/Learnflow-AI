@@ -18,9 +18,9 @@ teaches with premium lesson material, sharpens weak spots with adaptive quizzes,
 | Backend   | FastAPI, SQLAlchemy |
 | Database  | SQLite by default · swappable to **Supabase PostgreSQL** via `DATABASE_URL` |
 | Auth      | JWT (email + password) |
-| AI        | **Gemini 2.5 Flash** (with a built-in Socratic fallback if no key is set) |
+| AI        | **NVIDIA NIM** (with a built-in Socratic fallback if no key is set) |
 
-The app runs fully offline with zero external setup. Add a Gemini key and/or a Supabase
+The app runs fully offline with zero external setup. Add NVIDIA API keys and/or a Postgres
 connection string to upgrade. No code changes required.
 
 ---
@@ -37,7 +37,7 @@ Learnflow-AI/
 │       │                    lessons, mastery, dashboard, socrates
 │       ├── services/        grading · selection (adaptive) · mastery (+concepts) ·
 │       │                    concepts (prereq graph) · intelligence (command center) ·
-│       │                    learning_path · gemini
+│       │                    learning_path · llm
 │       └── seed/            real JEE catalog, 128-question bank, 31 premium lessons
 └── frontend/                Next.js app
     ├── app/
@@ -85,6 +85,6 @@ remediation, and plain-language AI recommendations.
 - **Learning path** respects prerequisites (topological order); weak chapters come first,
   strong chapters can be skipped. Two students with different assessments get different paths.
 - **Ask Socrates** never reveals the answer outright. It guides with one leading question at a
-  time, keeps session history, and uses Gemini 2.5 Flash (or the built-in Socratic fallback).
+  time, keeps session history, and uses NVIDIA NIM (or the built-in Socratic fallback).
 
 ---

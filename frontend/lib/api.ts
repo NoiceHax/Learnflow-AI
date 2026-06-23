@@ -4,6 +4,8 @@ import type {
   ChatSession,
   ChatTurn,
   Dashboard,
+  ExamHistoryItem,
+  ExamReport,
   LearningPath,
   Lesson,
   Mastery,
@@ -40,6 +42,30 @@ export class ApiError extends Error {
   }
 }
 
+function formatApiError(status: number, body: unknown): string {
+  if (body && typeof body === "object" && "detail" in body) {
+    const { detail } = body as { detail: unknown };
+    if (typeof detail === "string") return detail;
+    if (Array.isArray(detail)) {
+      const messages = detail
+        .map((item) => {
+          if (!item || typeof item !== "object" || !("msg" in item)) return null;
+          const msg = String((item as { msg: unknown }).msg);
+          const loc = (item as { loc?: unknown }).loc;
+          const field =
+            Array.isArray(loc) ? loc.filter((part) => part !== "body").join(".") : "";
+          if (field === "name") return "Please enter your full name.";
+          if (field === "email") return "Please enter a valid email address.";
+          if (field === "password") return "Password must be at least 6 characters.";
+          return field ? `${field}: ${msg}` : msg;
+        })
+        .filter(Boolean);
+      if (messages.length) return messages.join(" ");
+    }
+  }
+  return `Request failed (${status})`;
+}
+
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const token = getToken();
   const headers: Record<string, string> = {
@@ -59,7 +85,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     let detail = `Request failed (${res.status})`;
     try {
       const body = await res.json();
-      detail = typeof body.detail === "string" ? body.detail : detail;
+      detail = formatApiError(res.status, body);
     } catch {
       /* ignore */
     }
@@ -118,6 +144,9 @@ export const api = {
   // mastery + dashboard
   mastery: () => request<Mastery[]>("/mastery"),
   dashboard: () => request<Dashboard>("/dashboard"),
+  examHistory: () => request<ExamHistoryItem[]>("/analytics/exam-history"),
+  examReport: (kind: ExamHistoryItem["kind"], id: string) =>
+    request<ExamReport>(`/analytics/exam-history/${kind}/${id}`),
 
   // socrates
   chat: (message: string, session_id?: string, context?: SocratesContextPayload) =>

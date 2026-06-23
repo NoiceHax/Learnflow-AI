@@ -8,7 +8,7 @@ import { QuizResultView } from "@/components/quiz-result";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { api, ApiError } from "@/lib/api";
-import type { AnswerValue, Question, QuizResult } from "@/lib/types";
+import { MIN_QUIZ_QUESTIONS, type AnswerValue, type Question, type QuizResult } from "@/lib/types";
 
 type QuizMode = "practice" | "final";
 
@@ -31,12 +31,12 @@ function ExamQuizContent() {
     setResult(null);
     setError(null);
     try {
-      const qs = await api.quizQuestions(chapterId, 6, mode);
-      if (qs.length === 0) {
+      const qs = await api.quizQuestions(chapterId, isPractice ? 5 : 6, mode);
+      if (qs.length < MIN_QUIZ_QUESTIONS) {
         setError(
           isPractice
-            ? "No missed questions to practice. Take the final quiz first."
-            : "No questions available for this chapter.",
+            ? "Not enough practice questions yet. Run pregenerate-backups on the server, then try again."
+            : "Not enough questions for a quiz in this chapter yet.",
         );
         setStage("error");
         return;
@@ -56,13 +56,13 @@ function ExamQuizContent() {
       setResult(null);
       setError(null);
       try {
-        const qs = await api.quizQuestions(chapterId, 6, mode);
+        const qs = await api.quizQuestions(chapterId, isPractice ? 5 : 6, mode);
         if (cancelled) return;
-        if (qs.length === 0) {
+        if (qs.length < MIN_QUIZ_QUESTIONS) {
           setError(
             isPractice
-              ? "No missed questions to practice. Take the final quiz first."
-              : "No questions available for this chapter.",
+              ? "Not enough practice questions yet. Run pregenerate-backups on the server, then try again."
+              : "Not enough questions for a quiz in this chapter yet.",
           );
           setStage("error");
           return;
@@ -96,10 +96,12 @@ function ExamQuizContent() {
   const chapterLabel = questions[0]?.chapter ?? "";
   const title = isPractice ? `Practice Quiz · ${chapterLabel}` : `Final Quiz · ${chapterLabel}`;
   const subtitle = isPractice
-    ? "Review questions you missed. Correct answers leave this set."
+    ? "Mostly fresh AI questions each round. Get one right and it leaves your set; a new one replaces it."
     : "Score 100% to complete this chapter and unlock the next.";
 
-  if (stage === "loading" || stage === "submitting") {
+  const quizKey = questions.map((q) => q.id).join(",");
+
+  if (stage === "loading") {
     return <QuizSkeleton />;
   }
 
@@ -144,10 +146,12 @@ function ExamQuizContent() {
 
   return (
     <QuizEngine
+      key={quizKey}
       questions={questions}
       title={title}
       subtitle={subtitle}
       submitLabel={isPractice ? "Submit practice" : "Submit final quiz"}
+      submitting={stage === "submitting"}
       onSubmit={submit}
     />
   );

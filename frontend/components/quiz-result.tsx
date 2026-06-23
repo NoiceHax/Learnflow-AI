@@ -33,8 +33,8 @@ export function QuizResultView({
   result: QuizResult;
   questions: Question[];
   mode?: "practice" | "final";
-  onPrimary: () => void;
-  primaryLabel: string;
+  onPrimary?: () => void;
+  primaryLabel?: string;
   onSecondary?: () => void;
   secondaryLabel?: string;
   heading?: string;
@@ -105,11 +105,25 @@ export function QuizResultView({
         </Card>
       )}
 
-      {isPractice && result.correct_count > 0 && (
+      {isPractice && (result.correct_count > 0 || (result.adaptive?.replacements_generated ?? 0) > 0) && (
         <Card>
           <CardContent className="p-4 text-sm text-muted-foreground">
-            {result.correct_count} question{result.correct_count !== 1 ? "s" : ""} cleared from your practice set.
-            {result.weak_concepts.length > 0 ? " Keep practicing the rest." : " Great work. Retake the final quiz when ready."}
+            {result.correct_count > 0 && (
+              <p>
+                {result.correct_count} question{result.correct_count !== 1 ? "s" : ""} cleared from your practice set.
+              </p>
+            )}
+            {(result.adaptive?.replacements_generated ?? 0) > 0 && (
+              <p className={result.correct_count > 0 ? "mt-1" : ""}>
+                {result.adaptive!.replacements_generated} new AI question
+                {result.adaptive!.replacements_generated !== 1 ? "s" : ""} added for your next round.
+              </p>
+            )}
+            {result.weak_concepts.length > 0
+              ? " Keep practicing the rest."
+              : result.correct_count > 0
+                ? " Hit Practice again for a fresh set."
+                : null}
           </CardContent>
         </Card>
       )}
@@ -174,14 +188,18 @@ export function QuizResultView({
         })}
       </div>
 
-      <div className="flex flex-wrap justify-center gap-3 pt-2">
-        {onSecondary && secondaryLabel && (
-          <Button variant="outline" onClick={onSecondary}>
-            {secondaryLabel}
-          </Button>
-        )}
-        <Button onClick={onPrimary}>{primaryLabel}</Button>
-      </div>
+      {(onPrimary || onSecondary) && (
+        <div className="flex flex-wrap justify-center gap-3 pt-2">
+          {onSecondary && secondaryLabel && (
+            <Button variant="outline" onClick={onSecondary}>
+              {secondaryLabel}
+            </Button>
+          )}
+          {onPrimary && primaryLabel && (
+            <Button onClick={onPrimary}>{primaryLabel}</Button>
+          )}
+        </div>
+      )}
     </div>
   );
 }

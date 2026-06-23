@@ -16,8 +16,10 @@ from __future__ import annotations
 
 from sqlalchemy.orm import Session
 
+from ..config import settings
 from ..models import Chapter, LearningPathItem, Mastery
 from .mastery import MASTER_THRESHOLD, PASS_THRESHOLD, WEAK_THRESHOLD
+from .pilot import pilot_chapter_ids
 
 
 def _topo_order(chapters: list[Chapter]) -> list[Chapter]:
@@ -53,6 +55,7 @@ def generate(db: Session, user_id: str) -> list[LearningPathItem]:
         for m in db.query(Mastery).filter(Mastery.user_id == user_id).all()
     }
     ordered = _topo_order(chapters)
+    pilot_ids = pilot_chapter_ids(db) if settings.pilot_mode else None
 
     db.query(LearningPathItem).filter(LearningPathItem.user_id == user_id).delete()
 
@@ -60,24 +63,34 @@ def generate(db: Session, user_id: str) -> list[LearningPathItem]:
     items: list[LearningPathItem] = []
     for pos, ch in enumerate(ordered):
         mastery = mastery_rows.get(ch.id, 0.0)
-        prereq_mastery = mastery_rows.get(ch.prerequisite_id, 100.0) if ch.prerequisite_id else 100.0
         is_weak = mastery < WEAK_THRESHOLD
 
-        if mastery >= MASTER_THRESHOLD:
+        if pilot_ids is not None and ch.id not in pilot_ids:
+            status = "locked"
+            reason = "Outside the current pilot syllabus (3 chapters per subject)."
+        elif mastery >= MASTER_THRESHOLD:
             status = "mastered"
             reason = "Strong. You can skip ahead."
-        elif prereq_mastery < PASS_THRESHOLD:
-            status = "locked"
-            reason = "Locked until the prerequisite is cleared."
-        elif not first_focus_assigned:
-            status = "in_progress"
-            first_focus_assigned = True
-            reason = (
-                "Focus here next. Needs work." if is_weak else "Continue building on your strengths."
-            )
         else:
-            status = "available"
-            reason = "Extra practice recommended." if is_weak else "Ready when you are."
+            # Pilot chapters are all open after assessment — no prerequisite gate.
+            if pilot_ids is not None and ch.id in pilot_ids:
+                prereq_mastery = 100.0
+            else:
+                prereq_mastery = (
+                    mastery_rows.get(ch.prerequisite_id, 100.0) if ch.prerequisite_id else 100.0
+                )
+            if prereq_mastery < PASS_THRESHOLD:
+                status = "locked"
+                reason = "Locked until the prerequisite is cleared."
+            elif not first_focus_assigned:
+                status = "in_progress"
+                first_focus_assigned = True
+                reason = (
+                    "Focus here next. Needs work." if is_weak else "Continue building on your strengths."
+                )
+            else:
+                status = "available"
+                reason = "Extra practice recommended." if is_weak else "Ready when you are."
 
         item = LearningPathItem(
             user_id=user_id,

@@ -4,6 +4,7 @@ import logging
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
+from ..config import settings
 from ..database import get_db
 from ..deps import get_current_user
 from ..models import Chapter, Question, QuizAttempt, User
@@ -12,7 +13,9 @@ from ..services import learning_path as lp
 from ..services.adaptive import process_after_quiz
 from ..services.grading import grade_questions
 from ..services.mastery import mark_chapter_mastered, update_concept_mastery, upsert_mastery
+from ..services.pilot import assert_pilot_chapter_access
 from ..services.questions import question_to_out
+from ..services.quiz_rules import accept_quiz_questions, clamp_quiz_request
 from ..services.selection import chapter_questions
 
 router = APIRouter(prefix="/quiz", tags=["quiz"])
@@ -37,16 +40,21 @@ def get_quiz(
     chapter = db.get(Chapter, chapter_id)
     if chapter is None:
         raise HTTPException(404, "Chapter not found")
+    assert_pilot_chapter_access(db, chapter_id)
     quiz_mode = _quiz_mode(mode)
-    questions = chapter_questions(
-        db, chapter_id, user.id, count=max(3, min(count, 12)), mode=quiz_mode
+    pool_size = settings.practice_pool_size if quiz_mode == "practice" else count
+    question_count = clamp_quiz_request(pool_size if quiz_mode == "practice" else count)
+    questions = accept_quiz_questions(
+        chapter_questions(
+            db, chapter_id, user.id, count=question_count, mode=quiz_mode
+        )
     )
     if not questions:
         total = db.query(Question).filter(Question.chapter_id == chapter_id).count()
         if quiz_mode == "practice":
             raise HTTPException(
                 404,
-                "No missed questions to practice. Take the final quiz first or you have mastered them all.",
+                "No practice questions available yet. Run: python -m app.seed --pregenerate-backups",
             )
         logger.warning(
             "Quiz unavailable: chapter=%s user=%s (seeded_questions=%d)",
@@ -76,28 +84,39 @@ def submit_quiz(
     chapter = db.get(Chapter, chapter_id)
     if chapter is None:
         raise HTTPException(404, "Chapter not found")
+    assert_pilot_chapter_access(db, chapter_id)
 
     answer_map = {a.question_id: a.answer for a in body.answers}
     questions = db.query(Question).filter(Question.id.in_(answer_map.keys())).all()
     if not questions:
         raise HTTPException(400, "No valid questions submitted.")
+    if len(questions) < settings.min_quiz_questions:
+        raise HTTPException(
+            400,
+            f"A quiz must include at least {settings.min_quiz_questions} questions.",
+        )
 
     result = grade_questions(questions, answer_map)
 
-    attempt = QuizAttempt(
-        user_id=user.id,
-        chapter_id=chapter.id,
-        chapter_name=chapter.chapter_name,
-        score=result["score"],
-        accuracy=result["accuracy"],
-        time_taken=body.time_taken,
-        total_questions=result["total_questions"],
-        correct_count=result["correct_count"],
-        weak_concepts=result["weak_concepts"],
-    )
-    db.add(attempt)
-
     quiz_mode = _quiz_mode(body.mode)
+    attempt: QuizAttempt | None = None
+
+    if quiz_mode == "final":
+        attempt = QuizAttempt(
+            user_id=user.id,
+            chapter_id=chapter.id,
+            chapter_name=chapter.chapter_name,
+            mode="final",
+            score=result["score"],
+            accuracy=result["accuracy"],
+            time_taken=body.time_taken,
+            total_questions=result["total_questions"],
+            correct_count=result["correct_count"],
+            weak_concepts=result["weak_concepts"],
+            report=None,
+        )
+        db.add(attempt)
+
     perfect_final = (
         quiz_mode == "final"
         and result["total_questions"] > 0
@@ -117,9 +136,8 @@ def submit_quiz(
         db, user.id, chapter.id, questions, result["graded"], mode=quiz_mode
     )
     lp.generate(db, user.id)
-    db.commit()
 
-    return QuizResult(
+    quiz_response = QuizResult(
         score=result["score"],
         accuracy=result["accuracy"],
         total_questions=result["total_questions"],
@@ -130,3 +148,13 @@ def submit_quiz(
         adaptive=AdaptiveSummary(**adaptive),
         chapter_mastered=chapter_mastered,
     )
+
+    if quiz_mode == "final" and attempt is not None:
+        attempt.report = {
+            "result": quiz_response.model_dump(),
+            "questions": [question_to_out(q).model_dump() for q in questions],
+        }
+
+    db.commit()
+
+    return quiz_response

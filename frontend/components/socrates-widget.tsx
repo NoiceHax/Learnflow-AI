@@ -101,8 +101,12 @@ export function SocratesWidget() {
       const res = await api.chat(message, sessionId, context ?? undefined);
       setSessionId(res.session_id);
       setMessages((m) => [...m, { role: "socrates", content: res.reply }]);
-    } catch {
-      setMessages((m) => [...m, { role: "socrates", content: "Even I must pause. Ask me once more." }]);
+    } catch (err) {
+      const detail =
+        err instanceof Error && err.message
+          ? err.message
+          : "Cannot reach the server. Check that the backend is running and CORS is configured.";
+      setMessages((m) => [...m, { role: "socrates", content: detail }]);
     } finally {
       setSending(false);
     }

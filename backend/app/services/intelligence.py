@@ -50,7 +50,7 @@ def build_dashboard(db: Session, user_id: str) -> dict[str, Any]:
     concept_rows = db.query(ConceptMastery).filter(ConceptMastery.user_id == user_id).all()
     attempts = (
         db.query(QuizAttempt)
-        .filter(QuizAttempt.user_id == user_id)
+        .filter(QuizAttempt.user_id == user_id, QuizAttempt.mode == "final")
         .order_by(QuizAttempt.created_at.desc())
         .all()
     )
@@ -191,7 +191,7 @@ def build_dashboard(db: Session, user_id: str) -> dict[str, Any]:
     recent_activity: list[dict[str, Any]] = []
     for a in attempts[:10]:
         recent_activity.append({
-            "kind": "quiz", "title": f"Quiz · {a.chapter_name}",
+            "kind": "quiz", "title": f"Final Quiz · {a.chapter_name}",
             "detail": f"{a.correct_count}/{a.total_questions} correct · {a.accuracy:.0f}% accuracy",
             "score": a.score, "timestamp": a.created_at,
         })

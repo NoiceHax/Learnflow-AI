@@ -80,6 +80,15 @@ def submit_assessment(
             }
         )
 
+    report_payload = {
+        "score": overall,
+        "chapter_scores": chapter_scores,
+        "subject_scores": subject_scores,
+        "knowledge_map": knowledge_map,
+        "total_questions": len(questions),
+        "correct_count": correct_count,
+    }
+
     assessment = Assessment(
         user_id=user.id,
         score=overall,
@@ -87,6 +96,7 @@ def submit_assessment(
         subject_scores=subject_scores,
         total_questions=len(questions),
         correct_count=correct_count,
+        report=report_payload,
     )
     db.add(assessment)
 

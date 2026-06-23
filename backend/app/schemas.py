@@ -2,7 +2,11 @@
 from datetime import datetime
 from typing import Any, Literal, Optional
 
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, field_validator
+
+
+def _strip_str(v: object) -> object:
+    return v.strip() if isinstance(v, str) else v
 
 
 # ---------- Auth ----------
@@ -11,10 +15,20 @@ class SignupRequest(BaseModel):
     email: EmailStr
     password: str = Field(min_length=6, max_length=128)
 
+    @field_validator("name", "email", "password", mode="before")
+    @classmethod
+    def strip_fields(cls, v: object) -> object:
+        return _strip_str(v)
+
 
 class LoginRequest(BaseModel):
     email: EmailStr
-    password: str
+    password: str = Field(min_length=1)
+
+    @field_validator("email", "password", mode="before")
+    @classmethod
+    def strip_fields(cls, v: object) -> object:
+        return _strip_str(v)
 
 
 class UserOut(BaseModel):
@@ -42,6 +56,7 @@ class ChapterOut(BaseModel):
     order_index: int
     jee_weightage: int
     description: str
+    unlocked: bool = True
 
     class Config:
         from_attributes = True
@@ -178,6 +193,30 @@ class ActivityItem(BaseModel):
     timestamp: datetime
 
 
+class ExamHistoryItem(BaseModel):
+    kind: str  # assessment | final_quiz
+    id: str
+    title: str
+    chapter: Optional[str] = None
+    chapter_id: Optional[str] = None
+    subject: Optional[str] = None
+    score: float
+    accuracy: float
+    correct_count: int
+    total_questions: int
+    time_taken: Optional[int] = None
+    passed: Optional[bool] = None
+    timestamp: datetime
+
+
+class ExamReportOut(BaseModel):
+    kind: str  # assessment | final_quiz
+    assessment: Optional[AssessmentResult] = None
+    quiz_result: Optional[QuizResult] = None
+    questions: Optional[list[QuestionOut]] = None
+    detail_available: bool = True
+
+
 class DashboardOut(BaseModel):
     overall_progress: float
     accuracy: float
@@ -240,4 +279,4 @@ class ChatTurn(BaseModel):
 class ChatResponse(BaseModel):
     session_id: str
     reply: str
-    powered_by: str  # "nvidia" | "gemini" | "cache" | "fallback"
+    powered_by: str  # "nvidia" | "cache" | "fallback"

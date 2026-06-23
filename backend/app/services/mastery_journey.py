@@ -107,7 +107,11 @@ def build_mastery_journey(db: Session, user_id: str) -> dict[str, Any]:
         if r.chapter_id:
             concepts_by_chapter[r.chapter_id].append(r)
 
-    attempts = db.query(QuizAttempt).filter(QuizAttempt.user_id == user_id).all()
+    attempts = (
+        db.query(QuizAttempt)
+        .filter(QuizAttempt.user_id == user_id, QuizAttempt.mode == "final")
+        .all()
+    )
 
     def is_weak_concept(c: str) -> bool:
         row = next((r for r in concept_rows if r.concept == c or r.concept.endswith(c)), None)

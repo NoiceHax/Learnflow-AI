@@ -100,6 +100,7 @@ class Assessment(Base):
     subject_scores = Column(JSON, default=dict)  # {subject_slug: percent}
     total_questions = Column(Integer, default=0)
     correct_count = Column(Integer, default=0)
+    report = Column(JSON, nullable=True)
     created_at = Column(DateTime(timezone=True), default=_now, nullable=False)
 
 
@@ -110,12 +111,14 @@ class QuizAttempt(Base):
     user_id = Column(String(32), ForeignKey("users.id"), nullable=False, index=True)
     chapter_id = Column(String(32), ForeignKey("chapters.id"), nullable=False, index=True)
     chapter_name = Column(String(160), default="")
+    mode = Column(String(20), default="final", server_default="final", nullable=False)
     score = Column(Float, nullable=False)
     accuracy = Column(Float, nullable=False)
     time_taken = Column(Integer, default=0)  # seconds
     total_questions = Column(Integer, default=0)
     correct_count = Column(Integer, default=0)
     weak_concepts = Column(JSON, default=list)
+    report = Column(JSON, nullable=True)
     created_at = Column(DateTime(timezone=True), default=_now, nullable=False)
 
 
@@ -207,10 +210,10 @@ class UserQuestionState(Base):
     updated_at = Column(DateTime(timezone=True), default=_now, onupdate=_now)
 
 
-class GeminiCache(Base):
-    """Cached Gemini outputs: Socrates replies, etc. Questions live in `questions`."""
+class LlmCache(Base):
+    """Cached LLM outputs: Socrates replies, etc. Questions live in `questions`."""
 
-    __tablename__ = "gemini_cache"
+    __tablename__ = "gemini_cache"  # legacy table name in Neon; do not rename without migration
 
     cache_key = Column(String(64), primary_key=True)
     cache_type = Column(String(32), nullable=False, index=True)

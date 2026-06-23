@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Check,
   Lock,
@@ -234,10 +234,16 @@ export function MasteryJourneyMap({ journey }: { journey: MasteryJourney }) {
     }));
   }, [journey.focus_node_id, positions]);
 
-  const onWheel = useCallback((e: React.WheelEvent) => {
-    e.preventDefault();
-    const delta = e.deltaY > 0 ? 0.92 : 1.08;
-    setTransform((t) => ({ ...t, scale: Math.min(1.6, Math.max(0.45, t.scale * delta)) }));
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      const delta = e.deltaY > 0 ? 0.92 : 1.08;
+      setTransform((t) => ({ ...t, scale: Math.min(1.6, Math.max(0.45, t.scale * delta)) }));
+    };
+    el.addEventListener("wheel", onWheel, { passive: false });
+    return () => el.removeEventListener("wheel", onWheel);
   }, []);
 
   const onPointerDown = (e: React.PointerEvent) => {
@@ -313,7 +319,6 @@ export function MasteryJourneyMap({ journey }: { journey: MasteryJourney }) {
         <div
           ref={containerRef}
           className="journey-canvas scroll"
-          onWheel={onWheel}
           onPointerDown={onPointerDown}
           onPointerMove={onPointerMove}
           onPointerUp={onPointerUp}

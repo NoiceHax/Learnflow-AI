@@ -1,4 +1,4 @@
-"""Persistent cache for Gemini outputs. Reuse before calling the API."""
+"""Persistent cache for LLM outputs. Reuse before calling the API."""
 from __future__ import annotations
 
 import hashlib
@@ -7,7 +7,7 @@ from datetime import datetime, timedelta, timezone
 
 from sqlalchemy.orm import Session
 
-from ..models import GeminiCache, Question
+from ..models import LlmCache, Question
 from .question_gen import AI_CONCEPT_PREFIX
 
 _SOCRATES_TTL = timedelta(days=30)
@@ -25,8 +25,8 @@ def _hash_key(*parts: str) -> str:
 
 def cache_get(db: Session, cache_key: str, cache_type: str) -> str | None:
     row = (
-        db.query(GeminiCache)
-        .filter(GeminiCache.cache_key == cache_key, GeminiCache.cache_type == cache_type)
+        db.query(LlmCache)
+        .filter(LlmCache.cache_key == cache_key, LlmCache.cache_type == cache_type)
         .one_or_none()
     )
     if row is None:
@@ -47,10 +47,10 @@ def cache_set(
     ttl: timedelta,
 ) -> None:
     expires = _now() + ttl
-    row = db.query(GeminiCache).filter(GeminiCache.cache_key == cache_key).one_or_none()
+    row = db.query(LlmCache).filter(LlmCache.cache_key == cache_key).one_or_none()
     if row is None:
         db.add(
-            GeminiCache(
+            LlmCache(
                 cache_key=cache_key,
                 cache_type=cache_type,
                 payload=payload,

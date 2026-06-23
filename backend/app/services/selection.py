@@ -2,7 +2,7 @@
 
 The engine:
   * excludes questions the student already got wrong (retired per-user)
-  * generates same-difficulty replacements after misses (Gemini or pool fallback on submit only)
+  * generates same-difficulty replacements after misses (LLM on submit only, never on quiz load)
   * prioritises weak concepts and reshapes the learning path after each quiz
 """
 from __future__ import annotations
@@ -14,7 +14,9 @@ from datetime import datetime, timezone
 from sqlalchemy.orm import Session
 
 from ..models import Chapter, ConceptMastery, Mastery, Question
+from ..config import settings
 from .adaptive import retired_ids, select_final_quiz, select_practice_quiz
+from .quiz_rules import accept_quiz_questions
 
 _DIFF_ORDER = {"Easy": 0, "Medium": 1, "Advanced": 2}
 logger = logging.getLogger(__name__)
@@ -33,7 +35,7 @@ def _days_since(dt: datetime | None) -> float:
 
 
 def assessment_questions(db: Session, user_id: str | None = None, per_subject_cap: int = 5) -> list[Question]:
-    """Balanced diagnostic from the seeded question bank. Never calls Gemini on load."""
+    """Balanced diagnostic from the seeded question bank. Never calls the LLM on load."""
     chapters = (
         db.query(Chapter)
         .order_by(Chapter.subject_id, Chapter.jee_weightage.desc(), Chapter.order_index)
@@ -90,16 +92,20 @@ def chapter_questions(
     mode: str = "final",
 ) -> list[Question]:
     pool = db.query(Question).filter(Question.chapter_id == chapter_id).all()
-    if not pool:
+    if len(pool) < settings.min_quiz_questions:
         return []
 
     if not user_id:
-        return sorted(random.sample(pool, min(count, len(pool))), key=lambda q: _DIFF_ORDER.get(q.difficulty, 1))
+        picked = sorted(
+            random.sample(pool, min(count, len(pool))),
+            key=lambda q: _DIFF_ORDER.get(q.difficulty, 1),
+        )
+        return accept_quiz_questions(picked)
 
     if mode == "practice":
         selected = select_practice_quiz(db, user_id, chapter_id, count)
         if selected:
-            return selected
+            return accept_quiz_questions(selected)
         logger.warning("Practice selection empty for chapter=%s user=%s", chapter_id, user_id)
         return []
 
@@ -111,7 +117,7 @@ def chapter_questions(
         db, user_id, chapter_id, count, effective_mastery=eff, concept_mastery=cm
     )
     if selected:
-        return selected
+        return accept_quiz_questions(selected)
 
     logger.warning(
         "Final quiz selection empty for chapter=%s user=%s (pool=%d)",
