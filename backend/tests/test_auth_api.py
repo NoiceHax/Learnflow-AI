@@ -95,5 +95,5 @@ def test_health_endpoint_reports_offline_mode(client):
     assert r.status_code == 200
     body = r.json()
     assert body["status"] == "ok"
-    assert body["gemini"]["use_gemini"] is False
-    assert body["gemini"]["connected"] is False
+    assert body["llm"]["use_ai"] is False
+    assert body["llm"]["connected"] is False
