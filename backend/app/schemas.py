@@ -219,6 +219,9 @@ class ExamReportOut(BaseModel):
 
 class DashboardOut(BaseModel):
     overall_progress: float
+    jee_readiness: float = 0.0
+    predicted_jee_score: int = 0
+    subject_score_breakdown: dict[str, float] = {}
     accuracy: float
     time_spent_hours: float
     subject_mastery: list[dict[str, Any]]
@@ -274,9 +277,11 @@ class ChatTurn(BaseModel):
     role: Literal["user", "socrates"]
     content: str
     timestamp: datetime
+    difficulty: Optional[str] = None
 
 
 class ChatResponse(BaseModel):
     session_id: str
     reply: str
     powered_by: str  # "nvidia" | "cache" | "fallback"
+    difficulty: Optional[str] = None

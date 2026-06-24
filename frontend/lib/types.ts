@@ -261,6 +261,9 @@ export interface MasteryJourney {
 
 export interface Dashboard {
   overall_progress: number;
+  jee_readiness: number;
+  predicted_jee_score: number;
+  subject_score_breakdown?: { physics: number; chemistry: number; maths: number };
   accuracy: number;
   time_spent_hours: number;
   subject_mastery: { subject: string; slug: string; mastery: number }[];
@@ -302,6 +305,7 @@ export interface ChatResponse {
   session_id: string;
   reply: string;
   powered_by: string;
+  difficulty?: string;
 }
 
 export interface ChatTurn {
@@ -309,6 +313,7 @@ export interface ChatTurn {
   role: "user" | "socrates";
   content: string;
   timestamp: string;
+  difficulty?: string;
 }
 
 export interface ChatSession {

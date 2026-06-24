@@ -18,10 +18,10 @@ import os
 
 # Must run before any `from app...` import below.
 os.environ["DATABASE_URL"] = "sqlite://"  # in-memory: never writes astra.db
-os.environ["USE_AI"] = "false"            # no LLM network calls in tests
+os.environ["USE_GEMINI"] = "false"
+os.environ["AI_PROVIDER"] = "nvidia"
 os.environ["NVIDIA_API_KEY"] = ""
-os.environ["NVIDIA_API_KEYS"] = ""
-os.environ["PILOT_MODE"] = "false"
+os.environ["GEMINI_API_KEY"] = ""
 os.environ["JWT_SECRET"] = "test-secret-do-not-use-in-production-environments"
 
 import pytest
@@ -36,8 +36,6 @@ from app import models  # noqa: F401  (registers all tables on Base.metadata)
 # Belt-and-braces: force offline + deterministic auth regardless of any .env.
 settings.use_ai = False
 settings.nvidia_api_key = ""
-settings.nvidia_api_keys = ""
-settings.pilot_mode = False
 settings.jwt_secret = "test-secret-do-not-use-in-production-environments"
 
 

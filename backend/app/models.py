@@ -171,6 +171,7 @@ class ChatMessage(Base):
     message = Column(Text, nullable=False)
     response = Column(Text, nullable=False)
     chapter_context = Column(String(160), nullable=True)
+    difficulty_level = Column(String(32), nullable=True)
     timestamp = Column(DateTime(timezone=True), default=_now, nullable=False)
 
 

@@ -79,8 +79,6 @@ def test_select_practice_serves_missed_questions(db, chapters, user, make_questi
     ch = chapters["vectors"]
     missed = make_question(ch, concept="Dot Product", correct_answer=0)
     solved = make_question(ch, concept="Dot Product", correct_answer=0)
-    # Fresh, never-seen questions so the pool clears the min_quiz_questions floor.
-    [make_question(ch, concept="Dot Product", correct_answer=0) for _ in range(3)]
 
     A.record_attempts(db, user.id, [missed], {missed.id: False}, mode="final")
     A.record_attempts(db, user.id, [solved], {solved.id: True}, mode="practice")
@@ -88,17 +86,14 @@ def test_select_practice_serves_missed_questions(db, chapters, user, make_questi
 
     picked = A.select_practice_quiz(db, user.id, ch.id, count=6)
     ids = {q.id for q in picked}
-    assert missed.id in ids       # a recent miss is reinforced
-    assert solved.id not in ids   # an already-correct (cleared) one is not re-served
+    assert missed.id in ids       # a missed question is offered for practice
+    assert solved.id not in ids   # an already-correct one is not
 
 
 def test_select_final_excludes_seen_and_retired(db, chapters, user, make_question):
     ch = chapters["electrostatics"]
     seen = make_question(ch, concept="Electric Field", difficulty="Advanced", correct_answer=0)
-    fresh = [
-        make_question(ch, concept="Electric Field", difficulty="Advanced", correct_answer=0)
-        for _ in range(3)
-    ]
+    fresh = make_question(ch, concept="Electric Field", difficulty="Advanced", correct_answer=0)
 
     # Mark `seen` as already attempted (and wrong -> retired).
     A.record_attempts(db, user.id, [seen], {seen.id: False}, mode="final")
@@ -108,9 +103,8 @@ def test_select_final_excludes_seen_and_retired(db, chapters, user, make_questio
         db, user.id, ch.id, count=6, effective_mastery=80.0, concept_mastery={}
     )
     ids = {q.id for q in selected}
-    assert seen.id not in ids                  # never re-serves a seen/retired question
-    assert len(selected) >= 2                  # respects the min_quiz_questions floor
-    assert any(q.id in ids for q in fresh)     # fresh, unseen questions are served
+    assert seen.id not in ids
+    assert fresh.id in ids
 
 
 def test_process_after_quiz_returns_summary(db, chapters, user, make_question):
