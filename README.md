@@ -1,6 +1,6 @@
 <div align="center">
 
-# Astra
+# Learnflow AI
 ### AI Learning Platform for JEE Advanced
 
 **Adaptive learning paths · Concept-level mastery · Socratic AI tutor**
@@ -8,14 +8,14 @@
 [![Next.js](https://img.shields.io/badge/Next.js_15-000000?style=flat-square&logo=nextdotjs&logoColor=white)](https://nextjs.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-009688?style=flat-square&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?style=flat-square&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
-[![Gemini](https://img.shields.io/badge/Gemini_2.5_Flash-8E75B2?style=flat-square&logo=google&logoColor=white)](https://deepmind.google/technologies/gemini/)
+[![NVIDIA NIM](https://img.shields.io/badge/NVIDIA_NIM-76B900?style=flat-square&logo=nvidia&logoColor=white)](https://build.nvidia.com/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](LICENSE)
 
 </div>
 
 ---
 
-Astra is a production-quality AI learning platform for Grade 12 students preparing for JEE Advanced, covering Organic Chemistry, Inorganic Chemistry, Advanced Physics, and Advanced Mathematics.
+Learnflow AI is a production-quality AI learning platform for Grade 12 students preparing for JEE Advanced, covering Organic Chemistry, Inorganic Chemistry, Advanced Physics, and Advanced Mathematics.
 
 It builds a personalised learning path from an initial assessment, teaches with premium lesson material, sharpens weak spots with adaptive quizzes, and offers **Ask Socrates** — an AI tutor that guides with questions instead of handing over answers.
 
@@ -23,7 +23,7 @@ It builds a personalised learning path from an initial assessment, teaches with 
 
 ## How It Works
 
-Sign up → take an initial assessment → Astra builds your knowledge profile. From there, the dashboard becomes your command center: it surfaces what to study next, what's blocking your progress, and what you've forgotten and need to revisit. You never hand-build your path — the system decides based on where you actually are, not where the syllabus says you should be.
+Sign up → take an initial assessment → Learnflow AI builds your knowledge profile. From there, the dashboard becomes your command center: it surfaces what to study next, what's blocking your progress, and what you've forgotten and need to revisit. You never hand-build your path — the system decides based on where you actually are, not where the syllabus says you should be.
 
 ---
 
@@ -33,7 +33,7 @@ Sign up → take an initial assessment → Astra builds your knowledge profile. 
 
 **Recursive Remediation** — When a concept keeps failing, the prerequisite graph decomposes it into its foundations (e.g. *Gauss's Law → Electric Flux → Vector Area → Dot Product*) and recommends teaching those first.
 
-**Ask Socrates** — A floating AI tutor on every lesson page, aware of the subject, chapter, and content on screen. It never reveals the answer — it asks one leading question at a time and guides you to the insight yourself. Powered by Gemini 2.5 Flash with a built-in fallback if no key is set.
+**Ask Socrates** — A floating AI tutor on every lesson page, aware of the subject, chapter, and content on screen. It never reveals the answer — it asks one leading question at a time and guides you to the insight yourself. Powered by NVIDIA NIM with a built-in Socratic fallback if no key is set.
 
 **Adaptive Quiz Engine** — Supports single correct, multiple correct, integer, and numerical question types with a timer, mark-for-review, and instant evaluation. Powers both the initial assessment and chapter practice.
 
@@ -51,9 +51,22 @@ Sign up → take an initial assessment → Astra builds your knowledge profile. 
 | Backend | FastAPI, SQLAlchemy |
 | Database | SQLite (default) · Supabase PostgreSQL via `DATABASE_URL` |
 | Auth | JWT (email + password) |
-| AI | Gemini 2.5 Flash · built-in Socratic fallback |
+| AI | NVIDIA NIM (OpenAI-compatible) · built-in Socratic fallback |
 
-The app runs fully offline with zero external setup. Add a Gemini key and/or a Supabase connection string to upgrade — no code changes required.
+The app runs fully offline with zero external setup. Add NVIDIA API keys and/or a Supabase connection string to upgrade — no code changes required.
+
+---
+
+## AI Models
+
+All live AI calls go through [NVIDIA NIM](https://build.nvidia.com/). Models are configured via `NVIDIA_MODEL`, `NVIDIA_MODELS`, and `NVIDIA_QUESTION_MODELS` in `backend/.env` (see `backend/app/config.py` for defaults).
+
+| Role | Primary | Fallback chain |
+|---|---|---|
+| **Socrates tutor** | `stepfun-ai/step-3.5-flash` | `stepfun-ai/step-3.5-flash` → `deepseek-ai/deepseek-v4-flash` → `deepseek-ai/deepseek-v4-pro` → `mistralai/mistral-medium-3.5-128b` |
+| **Question generation** | `stepfun-ai/step-3.5-flash` | Same four-model chain (JSON-stable models only; reasoning endpoints are filtered out) |
+
+Set `USE_AI=false` to disable all network calls — Socrates uses the built-in fallback and quizzes serve from the seeded question bank.
 
 ---
 
