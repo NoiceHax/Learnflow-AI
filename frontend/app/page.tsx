@@ -12,6 +12,7 @@ import {
   BarChart3,
 } from "lucide-react";
 import { Brand } from "@/components/brand";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 const SUBJECTS = [
   { name: "Organic Chemistry", icon: FlaskConical, blurb: "GOC, hydrocarbons, carbonyls, amines & more." },
@@ -30,14 +31,40 @@ const FLOW = [
 
 export default function LandingPage() {
   return (
-    <div className="min-h-screen bg-background">
-      <header className="topnav">
+    <div className="min-h-screen bg-background relative overflow-hidden">
+      {/* Background animated glows */}
+      <div className="bg-glow-container">
+        <div 
+          className="bg-glow-circle" 
+          style={{ 
+            top: -150, 
+            left: "15%", 
+            width: 500, 
+            height: 500, 
+            background: "radial-gradient(circle, rgba(99,102,241,0.18) 0%, transparent 70%)" 
+          }} 
+        />
+        <div 
+          className="bg-glow-circle" 
+          style={{ 
+            top: 200, 
+            right: "10%", 
+            width: 600, 
+            height: 600, 
+            background: "radial-gradient(circle, rgba(168,85,247,0.15) 0%, transparent 70%)",
+            animationDelay: "-6s" 
+          }} 
+        />
+      </div>
+
+      <header className="topnav relative z-10">
         <div className="lf-wide">
           <Brand />
-          <div className="lf-row" style={{ gap: 12 }}>
+          <div className="lf-row" style={{ gap: 16 }}>
             <Link href="/login?mode=signin" className="navlink">
               Sign in
             </Link>
+            <ThemeToggle />
             <Link href="/login?mode=signup" className="btn btn-solid btn-sm">
               Get started
             </Link>
@@ -45,23 +72,23 @@ export default function LandingPage() {
         </div>
       </header>
 
-      <section style={{ borderBottom: "1px solid var(--hairline-soft)" }}>
+      <section style={{ borderBottom: "1px solid var(--hairline-soft)", position: "relative", zIndex: 1 }}>
         <div className="lf-wide" style={{ maxWidth: 880, textAlign: "center", padding: "112px 24px 120px" }}>
           <div
-            className="chip"
+            className="chip animate-fade-in-up delay-100"
             style={{ margin: "0 auto 24px", display: "inline-flex" }}
           >
             <span style={{ width: 6, height: 6, borderRadius: 99, background: "var(--indigo-bright)" }} />
             Built for JEE Advanced · Grade 12
           </div>
-          <h1 className="display" style={{ fontSize: 60, maxWidth: 720, margin: "0 auto", lineHeight: 1.04 }}>
+          <h1 className="display animate-fade-in-up delay-200" style={{ fontSize: 60, maxWidth: 720, margin: "0 auto", lineHeight: 1.04 }}>
             A strict mentor that helps you <span className="accent">understand</span>, not memorize.
           </h1>
-          <p className="body-lg dim" style={{ maxWidth: 600, margin: "22px auto 0" }}>
+          <p className="body-lg dim animate-fade-in-up delay-300" style={{ maxWidth: 600, margin: "22px auto 0" }}>
             LEARNFLOW AI builds an adaptive path from your assessment, teaches with premium coaching
             material, and repairs weak foundations, guided every step by Socrates.
           </p>
-          <div className="lf-row" style={{ gap: 12, justifyContent: "center", marginTop: 34, flexWrap: "wrap" }}>
+          <div className="lf-row animate-fade-in-up delay-400" style={{ gap: 12, justifyContent: "center", marginTop: 34, flexWrap: "wrap" }}>
             <Link href="/login?mode=signup" className="btn btn-solid btn-lg">
               Start your assessment <ArrowRight size={16} />
             </Link>
@@ -72,11 +99,11 @@ export default function LandingPage() {
         </div>
       </section>
 
-      <section className="lf-wide" style={{ padding: "72px 24px" }}>
-        <div className="lf-label" style={{ textAlign: "center", marginBottom: 32 }}>
+      <section className="lf-wide relative z-10" style={{ padding: "72px 24px" }}>
+        <div className="lf-label animate-fade-in-up delay-500" style={{ textAlign: "center", marginBottom: 32 }}>
           Four subjects · the complete JEE Advanced syllabus
         </div>
-        <div className="landing-grid-4">
+        <div className="landing-grid-4 animate-fade-in-up delay-500">
           {SUBJECTS.map((s) => (
             <div key={s.name} className="surface pad">
               <div
@@ -104,7 +131,7 @@ export default function LandingPage() {
         </div>
       </section>
 
-      <section style={{ borderTop: "1px solid var(--hairline-soft)" }}>
+      <section style={{ borderTop: "1px solid var(--hairline-soft)", position: "relative", zIndex: 10 }}>
         <div className="lf-wide" style={{ padding: "80px 24px" }}>
           <h2 className="headline" style={{ textAlign: "center" }}>
             A learning loop that moves the needle
@@ -141,7 +168,7 @@ export default function LandingPage() {
         </div>
       </section>
 
-      <footer style={{ borderTop: "1px solid var(--hairline-soft)" }}>
+      <footer style={{ borderTop: "1px solid var(--hairline-soft)", position: "relative", zIndex: 10 }}>
         <div
           className="lf-wide between"
           style={{ padding: "32px 24px", flexWrap: "wrap", gap: 16 }}
