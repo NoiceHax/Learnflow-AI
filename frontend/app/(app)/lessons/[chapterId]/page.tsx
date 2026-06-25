@@ -203,8 +203,8 @@ export default function LessonPage() {
                     onChange={(e) => setSelectedExam(e.target.value)}
                     className="rounded border bg-background px-2 py-1 text-sm text-foreground focus:outline-none"
                   >
-                    {["All", ...Array.from(new Set(pyqs.map((q) => q.pyq_exam).filter((ex): ex is string => !!ex))).sort()].map((ex) => (
-                      <option key={ex || ""} value={ex || ""}>{ex}</option>
+                    {["All", ...Array.from(new Set(pyqs.map((q) => q.pyq_exam).filter((exam): exam is string => exam !== null && exam !== undefined))).sort()].map((ex) => (
+                      <option key={ex} value={ex}>{ex}</option>
                     ))}
                   </select>
                 </div>
