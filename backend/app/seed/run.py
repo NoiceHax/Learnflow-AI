@@ -117,6 +117,9 @@ def _seed_questions(db: Session, chapters: dict[str, Chapter]) -> int:
                 tolerance=q.get("tolerance"),
                 unit=q.get("unit"),
                 solution=q.get("solution", ""),
+                is_pyq=q.get("is_pyq", False),
+                pyq_year=q.get("pyq_year"),
+                pyq_exam=q.get("pyq_exam"),
             )
         )
         count += 1

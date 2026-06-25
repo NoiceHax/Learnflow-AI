@@ -88,6 +88,9 @@ class Question(Base):
     tolerance = Column(Float, nullable=True)  # for numerical
     unit = Column(String(40), nullable=True)
     solution = Column(Text, default="")
+    is_pyq = Column(Boolean, default=False, nullable=False)
+    pyq_year = Column(Integer, nullable=True)
+    pyq_exam = Column(String(50), nullable=True)
 
 
 class Assessment(Base):

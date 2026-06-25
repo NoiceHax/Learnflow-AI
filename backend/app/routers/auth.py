@@ -1,14 +1,25 @@
 """Authentication: signup, login, current user."""
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 
+from ..config import settings
 from ..database import get_db
 from ..deps import get_current_user
 from ..models import User
 from ..schemas import AuthResponse, LoginRequest, SignupRequest, UserOut
 from ..security import create_access_token, hash_password, verify_password
+from ..services.rate_limiter import limiter
 
 router = APIRouter(prefix="/auth", tags=["auth"])
+
+
+def _client_ip(request: Request) -> str:
+    """Best-effort client IP: respect X-Forwarded-For behind a reverse proxy."""
+    forwarded = request.headers.get("x-forwarded-for")
+    if forwarded:
+        return forwarded.split(",")[0].strip()
+    client = request.client
+    return client.host if client else "unknown"
 
 
 @router.post("/signup", response_model=AuthResponse, status_code=status.HTTP_201_CREATED)
@@ -24,7 +35,20 @@ def signup(body: SignupRequest, db: Session = Depends(get_db)):
 
 
 @router.post("/login", response_model=AuthResponse)
-def login(body: LoginRequest, db: Session = Depends(get_db)):
+def login(body: LoginRequest, request: Request, db: Session = Depends(get_db)):
+    # IP-based brute-force protection: limit login attempts per IP
+    ip = _client_ip(request)
+    if limiter.is_rate_limited(
+        user_id=f"ip:{ip}",
+        action="login",
+        limit_per_minute=settings.rate_limit_login_minute,
+        limit_per_day=settings.rate_limit_login_minute * 60,
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Too many login attempts. Please wait a minute before trying again.",
+        )
+
     email = body.email.lower().strip()
     user = db.query(User).filter(User.email == email).first()
     if user is None or not verify_password(body.password, user.password_hash):

@@ -121,8 +121,18 @@ export const api = {
     }),
 
   // quiz: mode practice (missed questions) | final (chapter completion quiz)
-  quizQuestions: (chapterId: string, count = 6, mode: "practice" | "final" = "final") =>
-    request<Question[]>(`/quiz/${chapterId}/questions?count=${count}&mode=${mode}`),
+  quizQuestions: (
+    chapterId: string,
+    count = 6,
+    mode: "practice" | "final" = "final",
+    filters?: { is_pyq?: boolean; pyq_year?: number; pyq_exam?: string }
+  ) => {
+    let url = `/quiz/${chapterId}/questions?count=${count}&mode=${mode}`;
+    if (filters?.is_pyq !== undefined) url += `&is_pyq=${filters.is_pyq}`;
+    if (filters?.pyq_year) url += `&pyq_year=${filters.pyq_year}`;
+    if (filters?.pyq_exam) url += `&pyq_exam=${encodeURIComponent(filters.pyq_exam)}`;
+    return request<Question[]>(url);
+  },
   submitQuiz: (
     chapterId: string,
     answers: { question_id: string; answer: unknown }[],
