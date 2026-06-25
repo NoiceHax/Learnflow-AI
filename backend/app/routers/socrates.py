@@ -31,7 +31,7 @@ def chat(body: ChatRequest, db: Session = Depends(get_db), user: User = Depends(
 
     context = body.context.model_dump() if body.context else None
     chapter_label = (context or {}).get("chapter") or body.chapter_context
-    reply, powered_by = ask_socrates(body.message, history, body.chapter_context, context, db=db)
+    reply, powered_by, difficulty = ask_socrates(body.message, history, body.chapter_context, context, db=db)
 
     db.add(
         ChatMessage(
@@ -40,10 +40,11 @@ def chat(body: ChatRequest, db: Session = Depends(get_db), user: User = Depends(
             message=body.message,
             response=reply,
             chapter_context=chapter_label,
+            difficulty_level=difficulty,
         )
     )
     db.commit()
-    return ChatResponse(session_id=session_id, reply=reply, powered_by=powered_by)
+    return ChatResponse(session_id=session_id, reply=reply, powered_by=powered_by, difficulty=difficulty)
 
 
 @router.get("/sessions")
@@ -84,5 +85,5 @@ def get_session(
     turns: list[ChatTurn] = []
     for m in msgs:
         turns.append(ChatTurn(id=m.id + "-u", role="user", content=m.message, timestamp=m.timestamp))
-        turns.append(ChatTurn(id=m.id + "-s", role="socrates", content=m.response, timestamp=m.timestamp))
+        turns.append(ChatTurn(id=m.id + "-s", role="socrates", content=m.response, timestamp=m.timestamp, difficulty=m.difficulty_level))
     return turns

@@ -8,6 +8,8 @@ import { api } from "@/lib/api";
 interface Msg {
   role: "user" | "socrates";
   content: string;
+  difficulty?: string;
+  poweredBy?: string;
 }
 
 const QUIPS = [
@@ -66,6 +68,7 @@ export function SocratesWidget() {
   const [sessionId, setSessionId] = useState<string | undefined>();
   const [sending, setSending] = useState(false);
   const [quip, setQuip] = useState(QUIPS[0]);
+  const [lastPoweredBy, setLastPoweredBy] = useState<string | null>(null);
   const scroller = useRef<HTMLDivElement>(null);
   const pendingSent = useRef(false);
 
@@ -100,7 +103,8 @@ export function SocratesWidget() {
     try {
       const res = await api.chat(message, sessionId, context ?? undefined);
       setSessionId(res.session_id);
-      setMessages((m) => [...m, { role: "socrates", content: res.reply }]);
+      setLastPoweredBy(res.powered_by);
+      setMessages((m) => [...m, { role: "socrates", content: res.reply, difficulty: res.difficulty, poweredBy: res.powered_by }]);
     } catch (err) {
       const detail =
         err instanceof Error && err.message
@@ -130,6 +134,21 @@ export function SocratesWidget() {
               <span className="geist" style={{ fontWeight: 600, fontSize: 14, letterSpacing: "-0.01em" }}>
                 Socrates
               </span>
+              {lastPoweredBy === "nvidia" && (
+                <span style={{
+                  fontSize: 9,
+                  fontWeight: 700,
+                  letterSpacing: "0.1em",
+                  textTransform: "uppercase",
+                  padding: "2px 7px",
+                  borderRadius: 99,
+                  background: "color-mix(in srgb, var(--indigo) 14%, transparent)",
+                  color: "var(--indigo-bright)",
+                  border: "1px solid color-mix(in srgb, var(--indigo) 30%, transparent)",
+                }}>
+                  ✦ Live AI
+                </span>
+              )}
             </div>
             <button className="navlink" aria-label="Close Socrates" onClick={() => setOpen(false)}>
               <X size={16} />
@@ -179,11 +198,79 @@ export function SocratesWidget() {
               ) : (
                 <div key={i} className="msg-soc fade-in" style={{ maxWidth: "94%" }}>
                   <div
-                    className="faint"
-                    style={{ fontSize: 10.5, letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: 5 }}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      marginBottom: 5,
+                    }}
                   >
-                    Socrates asks
+                    <span
+                      className="faint"
+                      style={{ fontSize: 10.5, letterSpacing: "0.12em", textTransform: "uppercase" }}
+                    >
+                      Socrates asks
+                    </span>
+                    {m.difficulty && (
+                      <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                        <span
+                          style={{
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: 4,
+                            fontSize: 9.5,
+                            fontWeight: 700,
+                            padding: "3px 8px",
+                            borderRadius: 99,
+                            letterSpacing: "0.06em",
+                            textTransform: "uppercase",
+                            background:
+                              m.difficulty === "Beginner"
+                                ? "color-mix(in srgb, #4ade80 18%, transparent)"
+                                : m.difficulty === "Advanced"
+                                  ? "color-mix(in srgb, #f87171 18%, transparent)"
+                                  : "color-mix(in srgb, #fbbf24 18%, transparent)",
+                            color:
+                              m.difficulty === "Beginner"
+                                ? "#4ade80"
+                                : m.difficulty === "Advanced"
+                                  ? "#f87171"
+                                  : "#fbbf24",
+                            border: `1px solid ${
+                              m.difficulty === "Beginner"
+                                ? "rgba(74,222,128,0.3)"
+                                : m.difficulty === "Advanced"
+                                  ? "rgba(248,113,113,0.3)"
+                                  : "rgba(251,191,36,0.3)"
+                            }`,
+                          }}
+                        >
+                          <span>
+                            {m.difficulty === "Beginner" ? "◆" : m.difficulty === "Advanced" ? "★" : "◈"}
+                          </span>
+                          AI · {m.difficulty}
+                        </span>
+                      </div>
+                    )}
                   </div>
+                  {m.difficulty && (
+                    <div
+                      style={{
+                        fontSize: 10,
+                        color: "var(--text-faint)",
+                        marginBottom: 5,
+                        fontStyle: "italic",
+                        letterSpacing: "0.01em",
+                      }}
+                    >
+                      {m.difficulty === "Beginner"
+                        ? "Concept explained with intuition & simple terms"
+                        : m.difficulty === "Advanced"
+                          ? "Rigorous treatment with derivations & edge cases"
+                          : "Practical application with conceptual depth"}
+                    </div>
+                  )}
+
                   <div
                     style={{ fontSize: 14.5, lineHeight: 1.55, whiteSpace: "pre-line", color: "var(--text)" }}
                   >

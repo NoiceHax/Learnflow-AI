@@ -54,6 +54,12 @@ def apply_schema_patches() -> None:
         "ALTER TABLE assessments ADD COLUMN report JSON",
         "ALTER TABLE assessments ADD COLUMN IF NOT EXISTS report JSONB",
     )
+    add_column(
+        "chat_history",
+        "difficulty_level",
+        "ALTER TABLE chat_history ADD COLUMN difficulty_level VARCHAR(32)",
+        "ALTER TABLE chat_history ADD COLUMN IF NOT EXISTS difficulty_level VARCHAR(32)",
+    )
 
 
 def get_db():
