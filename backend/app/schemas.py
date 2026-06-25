@@ -94,6 +94,9 @@ class QuestionOut(BaseModel):
     options: Optional[list[QuestionOption]] = None
     unit: Optional[str] = None
     ai_generated: bool = False
+    is_pyq: bool = False
+    pyq_year: Optional[int] = None
+    pyq_exam: Optional[str] = None
 
     class Config:
         from_attributes = True
