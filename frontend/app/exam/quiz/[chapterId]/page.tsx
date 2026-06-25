@@ -10,7 +10,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { api, ApiError } from "@/lib/api";
 import { MIN_QUIZ_QUESTIONS, type AnswerValue, type Question, type QuizResult } from "@/lib/types";
 
-type QuizMode = "practice" | "final";
+type QuizMode = "practice" | "final" | "pyq";
 
 function ExamQuizContent() {
   const params = useParams<{ chapterId: string }>();
@@ -18,7 +18,7 @@ function ExamQuizContent() {
   const chapterId = params.chapterId;
   const router = useRouter();
   const rawMode = searchParams.get("mode");
-  const mode: QuizMode = rawMode === "practice" ? "practice" : "final";
+  const mode: QuizMode = rawMode === "pyq" ? "pyq" : rawMode === "practice" ? "practice" : "final";
   const isPractice = mode === "practice";
 
   const [stage, setStage] = useState<"loading" | "quiz" | "submitting" | "result" | "error">("loading");
@@ -26,15 +26,31 @@ function ExamQuizContent() {
   const [result, setResult] = useState<QuizResult | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  const pyqYear = searchParams.get("pyq_year") ? parseInt(searchParams.get("pyq_year")!) : undefined;
+  const pyqExam = searchParams.get("pyq_exam") || undefined;
+
   const load = useCallback(async () => {
     setStage("loading");
     setResult(null);
     setError(null);
     try {
-      const qs = await api.quizQuestions(chapterId, isPractice ? 5 : 6, mode);
-      if (qs.length < MIN_QUIZ_QUESTIONS) {
+      let qs: Question[];
+      if (mode === "pyq") {
+        qs = await api.quizQuestions(chapterId, 10, "practice", {
+          is_pyq: true,
+          pyq_year: pyqYear,
+          pyq_exam: pyqExam,
+        });
+      } else {
+        qs = await api.quizQuestions(chapterId, isPractice ? 5 : 6, mode);
+      }
+      
+      const minQs = mode === "pyq" ? 1 : MIN_QUIZ_QUESTIONS;
+      if (qs.length < minQs) {
         setError(
-          isPractice
+          mode === "pyq"
+            ? "No matching Previous Year Questions (PYQs) found for this chapter with the selected filters."
+            : isPractice
             ? "Not enough practice questions yet. Run pregenerate-backups on the server, then try again."
             : "Not enough questions for a quiz in this chapter yet.",
         );
@@ -47,44 +63,16 @@ function ExamQuizContent() {
       setError(e instanceof ApiError ? e.message : "Could not load this quiz.");
       setStage("error");
     }
-  }, [chapterId, mode, isPractice]);
+  }, [chapterId, mode, isPractice, pyqYear, pyqExam]);
 
   useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      setStage("loading");
-      setResult(null);
-      setError(null);
-      try {
-        const qs = await api.quizQuestions(chapterId, isPractice ? 5 : 6, mode);
-        if (cancelled) return;
-        if (qs.length < MIN_QUIZ_QUESTIONS) {
-          setError(
-            isPractice
-              ? "Not enough practice questions yet. Run pregenerate-backups on the server, then try again."
-              : "Not enough questions for a quiz in this chapter yet.",
-          );
-          setStage("error");
-          return;
-        }
-        setQuestions(qs);
-        setStage("quiz");
-      } catch (e) {
-        if (!cancelled) {
-          setError(e instanceof ApiError ? e.message : "Could not load this quiz.");
-          setStage("error");
-        }
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [chapterId, mode, isPractice]);
+    load();
+  }, [load]);
 
   async function submit(answers: { question_id: string; answer: AnswerValue }[], timeTaken: number) {
     setStage("submitting");
     try {
-      const res = await api.submitQuiz(chapterId, answers, timeTaken, mode);
+      const res = await api.submitQuiz(chapterId, answers, timeTaken, mode === "pyq" ? "practice" : mode);
       setResult(res);
       setStage("result");
     } catch (e) {
@@ -94,8 +82,14 @@ function ExamQuizContent() {
   }
 
   const chapterLabel = questions[0]?.chapter ?? "";
-  const title = isPractice ? `Practice Quiz · ${chapterLabel}` : `Final Quiz · ${chapterLabel}`;
-  const subtitle = isPractice
+  const title = mode === "pyq"
+    ? `PYQ Quiz · ${chapterLabel}`
+    : isPractice
+    ? `Practice Quiz · ${chapterLabel}`
+    : `Final Quiz · ${chapterLabel}`;
+  const subtitle = mode === "pyq"
+    ? `Practicing past year JEE questions from ${pyqExam || "JEE"} ${pyqYear ? `(${pyqYear})` : ""}`
+    : isPractice
     ? "Mostly fresh AI questions each round. Get one right and it leaves your set; a new one replaces it."
     : "Score 100% to complete this chapter and unlock the next.";
 
@@ -132,7 +126,7 @@ function ExamQuizContent() {
       <QuizResultView
         result={result}
         questions={questions}
-        mode={mode}
+        mode={mode === "pyq" ? "practice" : mode}
         heading={title}
         primaryLabel={result.chapter_mastered ? "Back to dashboard" : isPractice ? "Back to lesson" : "Back to dashboard"}
         onPrimary={() =>

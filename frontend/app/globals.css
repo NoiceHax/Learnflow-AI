@@ -67,6 +67,56 @@
     --focus: 72px;
     --ease: cubic-bezier(0.22, 0.61, 0.36, 1);
   }
+
+  .light {
+    /* shadcn HSL tokens for light mode */
+    --background: 240 10% 98%;
+    --foreground: 240 10% 3.9%;
+    --card: 0 0% 100%;
+    --card-foreground: 240 10% 3.9%;
+    --primary: 240 5.9% 10%;
+    --primary-foreground: 0 0% 98%;
+    --secondary: 240 4.8% 95.9%;
+    --secondary-foreground: 240 5.9% 10%;
+    --muted: 240 4.8% 95.9%;
+    --muted-foreground: 240 3.8% 46.1%;
+    --accent: 240 4.8% 95.9%;
+    --accent-foreground: 240 5.9% 10%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 98%;
+    --success: 142 76% 36%;
+    --success-foreground: 0 0% 98%;
+    --border: 240 5.9% 90%;
+    --input: 240 5.9% 90%;
+    --ring: 240 5.9% 10%;
+
+    /* Astra Academic light mode tokens */
+    --bg:            #f7f7fa;
+    --surface-1:     #ffffff;
+    --surface-2:     #f1f1f6;
+    --surface-3:     #e4e4eb;
+    --surface-4:     #d5d5e2;
+    --text:          #121217;
+    --text-dim:      #3f3f50;
+    --text-faint:    #6e6e80;
+    --hairline:      rgba(0, 0, 0, 0.08);
+    --hairline-soft: rgba(0, 0, 0, 0.05);
+    --indigo:        #4f46e5;
+    --indigo-bright: #6366f1;
+    --indigo-deep:   #3730a3;
+    --indigo-wash:   rgba(99, 102, 241, 0.08);
+    --indigo-line:   rgba(99, 102, 241, 0.18);
+    --success-clr:   #16a34a;
+    --success-wash:  rgba(22, 163, 74, 0.08);
+    --warning-clr:   #d97706;
+    --warning-wash:  rgba(217, 119, 6, 0.08);
+    --error-clr:     #dc2626;
+    --error-wash:    rgba(220, 38, 38, 0.08);
+    --solid:         #4f46e5;
+    --on-solid:      #ffffff;
+    --nav-bg:        rgba(247, 247, 250, 0.85);
+    --card-top:      #e4e4eb;
+  }
 }
 
 @layer base {
@@ -484,3 +534,100 @@
   .two-col { grid-template-columns: 1fr; gap: 40px; }
   .lf-section { margin-bottom: 56px; }
 }
+
+/* ============================================================
+   LEARNFLOW AI | Custom Animations & Theme Transitions
+   ============================================================ */
+
+/* Smooth theme transition */
+.theme-transitioning,
+.theme-transitioning * {
+  transition: background-color 0.4s cubic-bezier(0.4, 0, 0.2, 1), 
+              border-color 0.4s cubic-bezier(0.4, 0, 0.2, 1), 
+              color 0.4s cubic-bezier(0.4, 0, 0.2, 1), 
+              box-shadow 0.4s cubic-bezier(0.4, 0, 0.2, 1),
+              fill 0.4s cubic-bezier(0.4, 0, 0.2, 1),
+              stroke 0.4s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+/* Home Page Animations */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in-up {
+  opacity: 0;
+  animation: fadeInUp 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.delay-100 { animation-delay: 100ms; }
+.delay-200 { animation-delay: 200ms; }
+.delay-300 { animation-delay: 300ms; }
+.delay-400 { animation-delay: 400ms; }
+.delay-500 { animation-delay: 500ms; }
+
+/* Interactive Hover States */
+.surface {
+  transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), 
+              box-shadow 0.3s cubic-bezier(0.16, 1, 0.3, 1), 
+              border-color 0.3s cubic-bezier(0.16, 1, 0.3, 1),
+              background-color 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.surface:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 12px 30px rgba(99, 102, 241, 0.09);
+  border-color: rgba(99, 102, 241, 0.3);
+}
+
+.light .surface:hover {
+  box-shadow: 0 12px 30px rgba(99, 102, 241, 0.05);
+  border-color: rgba(99, 102, 241, 0.2);
+}
+
+/* Background animated glow */
+.bg-glow-container {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 100%;
+  height: 700px;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.bg-glow-circle {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(120px);
+  opacity: 0.12;
+  mix-blend-mode: screen;
+  animation: floatGlow 18s ease-in-out infinite alternate;
+}
+
+.light .bg-glow-circle {
+  mix-blend-mode: multiply;
+  opacity: 0.08;
+  filter: blur(140px);
+}
+
+@keyframes floatGlow {
+  0% {
+    transform: translate(0, 0) scale(1);
+  }
+  50% {
+    transform: translate(60px, 40px) scale(1.15);
+  }
+  100% {
+    transform: translate(-30px, -60px) scale(0.9);
+  }
+}
+

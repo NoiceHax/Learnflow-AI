@@ -9,6 +9,7 @@ import { PageSkeleton } from "@/components/page-skeleton";
 import { SocratesProvider } from "@/components/socrates-context";
 import { SocratesWidget } from "@/components/socrates-widget";
 import { useAuth } from "@/lib/auth";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 const NAV = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -68,12 +69,15 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <Link href="/dashboard" aria-label="LEARNFLOW AI home">
               <Brand />
             </Link>
-            <div className="navlinks">
-              {NAV.map((n) => (
-                <Link key={n.href} href={n.href} className={"navlink" + (isActive(n.href) ? " active" : "")}>
-                  {n.label}
-                </Link>
-              ))}
+            <div className="lf-row" style={{ gap: 16 }}>
+              <div className="navlinks">
+                {NAV.map((n) => (
+                  <Link key={n.href} href={n.href} className={"navlink" + (isActive(n.href) ? " active" : "")}>
+                    {n.label}
+                  </Link>
+                ))}
+              </div>
+              <ThemeToggle />
             </div>
           </div>
         </nav>

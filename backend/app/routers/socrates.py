@@ -1,21 +1,34 @@
 """Ask Socrates: guided, Socratic AI tutoring with session history."""
 import uuid
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
+from ..config import settings
 from ..database import get_db
 from ..deps import get_current_user
 from ..models import ChatMessage, User
 from ..schemas import ChatRequest, ChatResponse, ChatTurn
 from ..services.llm import ask_socrates
+from ..services.rate_limiter import limiter
 
 router = APIRouter(prefix="/socrates", tags=["socrates"])
 
 
 @router.post("/chat", response_model=ChatResponse)
 def chat(body: ChatRequest, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    if limiter.is_rate_limited(
+        user_id=user.id,
+        action="socrates",
+        limit_per_minute=settings.rate_limit_socrates_minute,
+        limit_per_day=settings.rate_limit_socrates_daily,
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Too many requests to Socrates tutoring chat. Please wait a bit or try again tomorrow."
+        )
+
     session_id = body.session_id or uuid.uuid4().hex
 
     prior = (

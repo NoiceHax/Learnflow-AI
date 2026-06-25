@@ -7,6 +7,7 @@ QUESTIONS = [
         "prompt": "The sum of the roots of the equation x² − 5x + 6 = 0 is:",
         "options": ["5", "6", "−5", "1"], "correct": 0,
         "solution": "For ax² + bx + c = 0, the sum of roots is −b/a = 5.",
+        "is_pyq": True, "pyq_year": 2022, "pyq_exam": "JEE Main",
     },
     {
         "chapter": "algebra", "difficulty": "Easy", "concept": "Complex Numbers", "type": "single_correct",
@@ -19,6 +20,7 @@ QUESTIONS = [
         "prompt": "The number of terms in the binomial expansion of (x + y)¹⁰ is:",
         "correct": 11,
         "solution": "The expansion of (x + y)ⁿ has (n + 1) terms, so 10 + 1 = 11.",
+        "is_pyq": True, "pyq_year": 2021, "pyq_exam": "JEE Main",
     },
     {
         "chapter": "algebra", "difficulty": "Easy", "concept": "Sequences and Series", "type": "single_correct",
@@ -31,6 +33,7 @@ QUESTIONS = [
         "prompt": "For the equation x² + x + 1 = 0, which statements are correct?",
         "options": ["Its discriminant is negative", "Its roots are complex conjugates", "Its roots are real", "The product of its roots is 1"], "correct": [0, 1, 3],
         "solution": "D = 1 − 4 = −3 < 0, so the roots are a pair of complex conjugates; they are not real. Product of roots = c/a = 1.",
+        "is_pyq": True, "pyq_year": 2023, "pyq_exam": "JEE Advanced",
     },
     # ---------------- Trigonometry ----------------
     {

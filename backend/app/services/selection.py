@@ -90,8 +90,24 @@ def chapter_questions(
     count: int = 6,
     *,
     mode: str = "final",
+    is_pyq: bool | None = None,
+    pyq_year: int | None = None,
+    pyq_exam: str | None = None,
 ) -> list[Question]:
-    pool = db.query(Question).filter(Question.chapter_id == chapter_id).all()
+    query = db.query(Question).filter(Question.chapter_id == chapter_id)
+    if is_pyq is not None:
+        query = query.filter(Question.is_pyq == is_pyq)
+    if pyq_year is not None:
+        query = query.filter(Question.pyq_year == pyq_year)
+    if pyq_exam is not None:
+        query = query.filter(Question.pyq_exam == pyq_exam)
+
+    pool = query.all()
+
+    if is_pyq is not None or pyq_year is not None or pyq_exam is not None:
+        random.shuffle(pool)
+        return accept_quiz_questions(pool[:count])
+
     if len(pool) < settings.min_quiz_questions:
         return []
 

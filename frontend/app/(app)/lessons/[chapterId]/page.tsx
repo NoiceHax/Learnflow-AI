@@ -13,6 +13,9 @@ import {
   AlertTriangle,
   Star,
   Dumbbell,
+  ChevronDown,
+  ChevronUp,
+  BookOpen,
 } from "lucide-react";
 import { PageSkeleton } from "@/components/page-skeleton";
 import { useSocrates } from "@/components/socrates-context";
@@ -20,7 +23,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { api, ApiError } from "@/lib/api";
-import type { Lesson } from "@/lib/types";
+import type { Lesson, Question } from "@/lib/types";
 
 export default function LessonPage() {
   const params = useParams<{ chapterId: string }>();
@@ -28,6 +31,10 @@ export default function LessonPage() {
   const { setContext, clearContext, setOpen } = useSocrates();
   const [lesson, setLesson] = useState<Lesson | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [pyqs, setPyqs] = useState<Question[]>([]);
+  const [selectedYear, setSelectedYear] = useState<string>("All");
+  const [selectedExam, setSelectedExam] = useState<string>("All");
+  const [expandedQId, setExpandedQId] = useState<string | null>(null);
 
   useEffect(() => {
     api
@@ -35,6 +42,13 @@ export default function LessonPage() {
       .then(setLesson)
       .catch((e) => setError(e instanceof ApiError ? e.message : "Could not load this lesson."));
   }, [params.chapterId]);
+
+  useEffect(() => {
+    if (!lesson) return;
+    api.quizQuestions(lesson.chapter_id, 30, "practice", { is_pyq: true })
+      .then(setPyqs)
+      .catch((e) => console.error("Could not load PYQs:", e));
+  }, [lesson]);
 
   // Feed the current lesson to Socrates so the floating tutor already knows the
   // subject, chapter, formulas and examples on screen.
@@ -161,6 +175,140 @@ export default function LessonPage() {
             </li>
           ))}
         </ul>
+      </Section>
+
+      <Section icon={BookOpen} title="Interactive PYQ Explorer">
+        {pyqs.length === 0 ? (
+          <p className="text-sm text-muted-foreground">No previous year questions seeded for this chapter yet.</p>
+        ) : (
+          <div className="space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg bg-secondary/20 p-3">
+              <div className="flex flex-wrap items-center gap-3">
+                <div>
+                  <label className="mr-2 text-xs font-semibold text-muted-foreground uppercase">Year</label>
+                  <select
+                    value={selectedYear}
+                    onChange={(e) => setSelectedYear(e.target.value)}
+                    className="rounded border bg-background px-2 py-1 text-sm text-foreground focus:outline-none"
+                  >
+                    {["All", ...Array.from(new Set(pyqs.map((q) => q.pyq_year).filter((y): y is number => !!y))).map(String).sort()].map((y) => (
+                      <option key={y} value={y}>{y}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="mr-2 text-xs font-semibold text-muted-foreground uppercase">Exam</label>
+                  <select
+                    value={selectedExam}
+                    onChange={(e) => setSelectedExam(e.target.value)}
+                    className="rounded border bg-background px-2 py-1 text-sm text-foreground focus:outline-none"
+                  >
+                    {["All", ...Array.from(new Set(pyqs.map((q) => q.pyq_exam).filter((exam): exam is string => exam !== null && exam !== undefined))).sort()].map((ex) => (
+                      <option key={ex} value={ex}>{ex}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              
+              <Button asChild size="sm">
+                <Link
+                  href={`/exam/quiz/${lesson.chapter_id}?mode=pyq${
+                    selectedYear !== "All" ? `&pyq_year=${selectedYear}` : ""
+                  }${selectedExam !== "All" ? `&pyq_exam=${encodeURIComponent(selectedExam)}` : ""}`}
+                >
+                  <PencilLine className="mr-1.5 size-4" /> Practice as Quiz ({
+                    pyqs.filter((q) => {
+                      const yearMatch = selectedYear === "All" || String(q.pyq_year) === selectedYear;
+                      const examMatch = selectedExam === "All" || q.pyq_exam === selectedExam;
+                      return yearMatch && examMatch;
+                    }).length
+                  })
+                </Link>
+              </Button>
+            </div>
+
+            <div className="space-y-3">
+              {pyqs
+                .filter((q) => {
+                  const yearMatch = selectedYear === "All" || String(q.pyq_year) === selectedYear;
+                  const examMatch = selectedExam === "All" || q.pyq_exam === selectedExam;
+                  return yearMatch && examMatch;
+                })
+                .map((q) => {
+                  const isExpanded = expandedQId === q.id;
+                  return (
+                    <div key={q.id} className="rounded-lg border bg-card p-4 transition hover:shadow-sm">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="space-y-1">
+                          <div className="flex flex-wrap gap-2">
+                            <Badge variant="outline" className="text-primary font-mono text-[10px]">
+                              {q.pyq_exam} {q.pyq_year}
+                            </Badge>
+                            <Badge variant="secondary" className="text-[10px]">
+                              {q.concept}
+                            </Badge>
+                            <Badge variant="outline" className="text-[10px] capitalize text-muted-foreground">
+                              {q.difficulty}
+                            </Badge>
+                          </div>
+                          <p className="text-sm font-medium leading-relaxed mt-2 text-foreground">{q.prompt}</p>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => setExpandedQId(isExpanded ? null : q.id)}
+                          className="shrink-0"
+                        >
+                          {isExpanded ? <ChevronUp className="size-4" /> : <ChevronDown className="size-4" />}
+                        </Button>
+                      </div>
+
+                      {isExpanded && (
+                        <div className="mt-3 border-t pt-3 space-y-3">
+                          {q.options && q.options.length > 0 && (
+                            <div className="grid gap-2 sm:grid-cols-2">
+                              {q.options.map((opt) => (
+                                <div
+                                  key={opt.id}
+                                  className="flex items-center gap-2 rounded border bg-secondary/10 p-2 text-xs"
+                                >
+                                  <span className="font-bold">{String.fromCharCode(65 + parseInt(opt.id))}.</span>
+                                  <span>{opt.text}</span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                          <div className="rounded-md bg-emerald-500/10 p-3 text-xs text-emerald-600 dark:text-emerald-400">
+                            <span className="font-bold">Correct Answer: </span>
+                            {q.type === "single_correct" && q.options
+                              ? String.fromCharCode(65 + Number(q.correct_answer))
+                              : q.type === "multiple_correct" && q.options
+                              ? (q.correct_answer as number[])
+                                  .map((idx) => String.fromCharCode(65 + idx))
+                                  .join(", ")
+                              : String(q.correct_answer)}
+                          </div>
+                          {q.solution && (
+                            <div className="rounded-md bg-secondary/40 p-3 text-xs text-muted-foreground">
+                              <span className="font-semibold text-foreground">Step-by-step Solution:</span>
+                              <p className="mt-1 leading-relaxed whitespace-pre-line">{q.solution}</p>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              {pyqs.filter((q) => {
+                const yearMatch = selectedYear === "All" || String(q.pyq_year) === selectedYear;
+                const examMatch = selectedExam === "All" || q.pyq_exam === selectedExam;
+                return yearMatch && examMatch;
+              }).length === 0 && (
+                <p className="text-center py-6 text-sm text-muted-foreground">No questions match the selected filters.</p>
+              )}
+            </div>
+          </div>
+        )}
       </Section>
 
       <Section icon={Dumbbell} title="Practice Problems">
