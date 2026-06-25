@@ -89,7 +89,7 @@ def get_quiz(
         user.id,
         len(questions),
     )
-    return [question_to_out(q) for q in questions]
+    return [question_to_out(q, include_answer=bool(is_pyq or pyq_year or pyq_exam)) for q in questions]
 
 
 @router.post("/{chapter_id}/submit", response_model=QuizResult)

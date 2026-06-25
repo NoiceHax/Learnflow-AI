@@ -90,6 +90,21 @@ def generate_for_chapter(
     if subject is None:
         return []
 
+    if user_id:
+        from ..config import settings
+        from .rate_limiter import limiter
+        if limiter.is_rate_limited(
+            user_id=user_id,
+            action="question_gen",
+            limit_per_minute=settings.rate_limit_question_gen_minute,
+            limit_per_day=settings.rate_limit_question_gen_daily,
+        ):
+            logger.warning(
+                "User %s is rate-limited for live question generation. Disallowing live API call.",
+                user_id,
+            )
+            allow_live_api = False
+
     exclude: list[str] = []
     blocked: set[str] = set(exclude_question_ids or ())
     pool = db.query(Question).filter(Question.chapter_id == chapter.id).all()

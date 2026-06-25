@@ -78,6 +78,12 @@ class Settings(BaseSettings):
     frontend_url: str = "http://localhost:3000"
     cors_origins_csv: str = Field(default="", validation_alias="CORS_ORIGINS")
 
+    # Rate Limiting & Abuse Protection
+    rate_limit_socrates_minute: int = Field(default=5, validation_alias="RATE_LIMIT_SOCRATES_MINUTE")
+    rate_limit_socrates_daily: int = Field(default=50, validation_alias="RATE_LIMIT_SOCRATES_DAILY")
+    rate_limit_question_gen_minute: int = Field(default=3, validation_alias="RATE_LIMIT_QUESTION_GEN_MINUTE")
+    rate_limit_question_gen_daily: int = Field(default=20, validation_alias="RATE_LIMIT_QUESTION_GEN_DAILY")
+
     @property
     def database_url_resolved(self) -> str:
         """Normalize Postgres URLs for SQLAlchemy (psycopg3 or psycopg2 on Render/Neon)."""

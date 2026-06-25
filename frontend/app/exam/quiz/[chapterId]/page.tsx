@@ -126,7 +126,7 @@ function ExamQuizContent() {
       <QuizResultView
         result={result}
         questions={questions}
-        mode={mode}
+        mode={mode === "pyq" ? "practice" : mode}
         heading={title}
         primaryLabel={result.chapter_mastered ? "Back to dashboard" : isPractice ? "Back to lesson" : "Back to dashboard"}
         onPrimary={() =>

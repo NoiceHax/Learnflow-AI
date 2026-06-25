@@ -52,6 +52,8 @@ export interface Question {
   is_pyq?: boolean;
   pyq_year?: number | null;
   pyq_exam?: string | null;
+  correct_answer?: AnswerValue;
+  solution?: string | null;
 }
 
 export type AnswerValue = number | number[] | string | null;

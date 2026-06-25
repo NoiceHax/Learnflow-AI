@@ -97,6 +97,8 @@ class QuestionOut(BaseModel):
     is_pyq: bool = False
     pyq_year: Optional[int] = None
     pyq_exam: Optional[str] = None
+    correct_answer: Optional[Any] = None
+    solution: Optional[str] = None
 
     class Config:
         from_attributes = True

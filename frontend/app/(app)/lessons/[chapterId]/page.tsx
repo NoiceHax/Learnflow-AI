@@ -191,7 +191,7 @@ export default function LessonPage() {
                     onChange={(e) => setSelectedYear(e.target.value)}
                     className="rounded border bg-background px-2 py-1 text-sm text-foreground focus:outline-none"
                   >
-                    {["All", ...Array.from(new Set(pyqs.map((q) => String(q.pyq_year)).filter(Boolean))).sort()].map((y) => (
+                    {["All", ...Array.from(new Set(pyqs.map((q) => q.pyq_year).filter((y): y is number => !!y))).map(String).sort()].map((y) => (
                       <option key={y} value={y}>{y}</option>
                     ))}
                   </select>
@@ -203,7 +203,7 @@ export default function LessonPage() {
                     onChange={(e) => setSelectedExam(e.target.value)}
                     className="rounded border bg-background px-2 py-1 text-sm text-foreground focus:outline-none"
                   >
-                    {["All", ...Array.from(new Set(pyqs.map((q) => q.pyq_exam).filter(Boolean))).sort()].map((ex) => (
+                    {["All", ...Array.from(new Set(pyqs.map((q) => q.pyq_exam).filter((ex): ex is string => !!ex))).sort()].map((ex) => (
                       <option key={ex} value={ex}>{ex}</option>
                     ))}
                   </select>
@@ -247,7 +247,7 @@ export default function LessonPage() {
                             <Badge variant="secondary" className="text-[10px]">
                               {q.concept}
                             </Badge>
-                            <Badge variant="ghost" className="text-[10px] capitalize text-muted-foreground">
+                            <Badge variant="outline" className="text-[10px] capitalize text-muted-foreground">
                               {q.difficulty}
                             </Badge>
                           </div>
