@@ -83,6 +83,9 @@ class Settings(BaseSettings):
     rate_limit_socrates_daily: int = Field(default=50, validation_alias="RATE_LIMIT_SOCRATES_DAILY")
     rate_limit_question_gen_minute: int = Field(default=3, validation_alias="RATE_LIMIT_QUESTION_GEN_MINUTE")
     rate_limit_question_gen_daily: int = Field(default=20, validation_alias="RATE_LIMIT_QUESTION_GEN_DAILY")
+    rate_limit_global_minute: int = Field(default=60, validation_alias="RATE_LIMIT_GLOBAL_MINUTE")
+    rate_limit_login_minute: int = Field(default=5, validation_alias="RATE_LIMIT_LOGIN_MINUTE")
+    rate_limit_quiz_load_minute: int = Field(default=10, validation_alias="RATE_LIMIT_QUIZ_LOAD_MINUTE")
 
     @property
     def database_url_resolved(self) -> str:

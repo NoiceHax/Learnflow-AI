@@ -2,6 +2,7 @@
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.responses import JSONResponse
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
@@ -16,6 +17,23 @@ from ..services.rate_limiter import limiter
 router = APIRouter(prefix="/socrates", tags=["socrates"])
 
 
+def _rate_limit_headers(user_id: str) -> dict[str, str]:
+    """Build X-RateLimit-* headers for the Socrates chat endpoint."""
+    info = limiter.get_remaining(
+        user_id=user_id,
+        action="socrates",
+        limit_per_minute=settings.rate_limit_socrates_minute,
+        limit_per_day=settings.rate_limit_socrates_daily,
+    )
+    headers = {
+        "X-RateLimit-Limit": f"{settings.rate_limit_socrates_minute}/min, {settings.rate_limit_socrates_daily}/day",
+        "X-RateLimit-Remaining": str(min(info["remaining_minute"], info["remaining_daily"])),
+    }
+    if info["retry_after"] > 0:
+        headers["Retry-After"] = str(info["retry_after"])
+    return headers
+
+
 @router.post("/chat", response_model=ChatResponse)
 def chat(body: ChatRequest, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     if limiter.is_rate_limited(
@@ -24,9 +42,11 @@ def chat(body: ChatRequest, db: Session = Depends(get_db), user: User = Depends(
         limit_per_minute=settings.rate_limit_socrates_minute,
         limit_per_day=settings.rate_limit_socrates_daily,
     ):
+        headers = _rate_limit_headers(user.id)
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-            detail="Too many requests to Socrates tutoring chat. Please wait a bit or try again tomorrow."
+            detail="Too many requests to Socrates tutoring chat. Please wait a bit or try again tomorrow.",
+            headers=headers,
         )
 
     session_id = body.session_id or uuid.uuid4().hex
@@ -57,7 +77,13 @@ def chat(body: ChatRequest, db: Session = Depends(get_db), user: User = Depends(
         )
     )
     db.commit()
-    return ChatResponse(session_id=session_id, reply=reply, powered_by=powered_by, difficulty=difficulty)
+
+    response_data = ChatResponse(session_id=session_id, reply=reply, powered_by=powered_by, difficulty=difficulty)
+    headers = _rate_limit_headers(user.id)
+    return JSONResponse(
+        content=response_data.model_dump(),
+        headers=headers,
+    )
 
 
 @router.get("/sessions")

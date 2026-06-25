@@ -9,6 +9,7 @@ from fastapi.responses import JSONResponse
 
 from .config import nvidia_api_keys_list, settings
 from .database import Base, engine, apply_schema_patches
+from .middleware.rate_limit_middleware import RateLimitMiddleware
 from .middleware.request_log import RequestLogMiddleware
 from .services.llm import active_model, active_provider, ai_requested, credential_configured, probe_llm
 from .services.llm_audit import audit_summary
@@ -118,6 +119,7 @@ async def unhandled_exception_handler(request: Request, exc: Exception):
 
 
 app.add_middleware(RequestLogMiddleware)
+app.add_middleware(RateLimitMiddleware)
 
 app.add_middleware(
     CORSMiddleware,

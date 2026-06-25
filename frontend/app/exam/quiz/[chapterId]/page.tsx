@@ -1,7 +1,7 @@
 "use client";
 
 import { useParams, useRouter, useSearchParams } from "next/navigation";
-import { Suspense, useCallback, useEffect, useState } from "react";
+import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { QuizSkeleton } from "@/components/page-skeleton";
 import { QuizEngine } from "@/components/quiz-engine";
 import { QuizResultView } from "@/components/quiz-result";
@@ -25,6 +25,9 @@ function ExamQuizContent() {
   const [questions, setQuestions] = useState<Question[]>([]);
   const [result, setResult] = useState<QuizResult | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [rateLimited, setRateLimited] = useState(false);
+  const [retryCooldown, setRetryCooldown] = useState(0);
+  const retryTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const pyqYear = searchParams.get("pyq_year") ? parseInt(searchParams.get("pyq_year")!) : undefined;
   const pyqExam = searchParams.get("pyq_exam") || undefined;
@@ -60,7 +63,25 @@ function ExamQuizContent() {
       setQuestions(qs);
       setStage("quiz");
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : "Could not load this quiz.");
+      if (e instanceof ApiError && e.status === 429) {
+        setRateLimited(true);
+        setRetryCooldown(30);
+        setError(e.message || "Too many quiz requests. Please wait a moment.");
+        // Start cooldown countdown
+        if (retryTimerRef.current) clearInterval(retryTimerRef.current);
+        let remaining = 30;
+        retryTimerRef.current = setInterval(() => {
+          remaining -= 1;
+          setRetryCooldown(remaining);
+          if (remaining <= 0) {
+            if (retryTimerRef.current) clearInterval(retryTimerRef.current);
+            retryTimerRef.current = null;
+            setRateLimited(false);
+          }
+        }, 1000);
+      } else {
+        setError(e instanceof ApiError ? e.message : "Could not load this quiz.");
+      }
       setStage("error");
     }
   }, [chapterId, mode, isPractice, pyqYear, pyqExam]);
@@ -103,19 +124,41 @@ function ExamQuizContent() {
     return (
       <Card className="mx-auto max-w-md">
         <CardContent className="space-y-4 p-6 text-center">
-          <p className="text-sm text-destructive">{error}</p>
-          <div className="flex justify-center gap-2">
-            {isPractice ? (
-              <Button variant="outline" onClick={() => router.push(`/exam/quiz/${chapterId}?mode=final`)}>
-                Take final quiz
-              </Button>
-            ) : (
-              <Button variant="outline" onClick={() => router.push("/dashboard")}>
-                Dashboard
-              </Button>
-            )}
-            <Button onClick={load}>Try again</Button>
-          </div>
+          {rateLimited ? (
+            <>
+              <div className="flex items-center justify-center gap-2 text-amber-500">
+                <span className="text-xl">⏳</span>
+                <p className="text-sm font-medium">Rate Limited</p>
+              </div>
+              <p className="text-xs text-muted-foreground">{error}</p>
+              <div className="mx-auto w-48 overflow-hidden rounded-full bg-muted" style={{ height: 4 }}>
+                <div
+                  className="h-full rounded-full bg-amber-500 transition-all duration-1000 ease-linear"
+                  style={{ width: `${Math.max(0, (retryCooldown / 30) * 100)}%` }}
+                />
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {retryCooldown > 0 ? `Ready in ${retryCooldown}s…` : "Ready! Try again."}
+              </p>
+              <Button onClick={load} disabled={retryCooldown > 0}>Try again</Button>
+            </>
+          ) : (
+            <>
+              <p className="text-sm text-destructive">{error}</p>
+              <div className="flex justify-center gap-2">
+                {isPractice ? (
+                  <Button variant="outline" onClick={() => router.push(`/exam/quiz/${chapterId}?mode=final`)}>
+                    Take final quiz
+                  </Button>
+                ) : (
+                  <Button variant="outline" onClick={() => router.push("/dashboard")}>
+                    Dashboard
+                  </Button>
+                )}
+                <Button onClick={load}>Try again</Button>
+              </div>
+            </>
+          )}
         </CardContent>
       </Card>
     );

@@ -1,7 +1,7 @@
 """Chapter practice quizzes: adaptive engine retires misses and spawns replacements."""
 import logging
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from ..config import settings
@@ -16,6 +16,7 @@ from ..services.mastery import mark_chapter_mastered, update_concept_mastery, up
 from ..services.pilot import assert_pilot_chapter_access
 from ..services.questions import question_to_out
 from ..services.quiz_rules import accept_quiz_questions, clamp_quiz_request
+from ..services.rate_limiter import limiter
 from ..services.selection import chapter_questions
 
 router = APIRouter(prefix="/quiz", tags=["quiz"])
@@ -44,6 +45,17 @@ def get_quiz(
     if chapter is None:
         raise HTTPException(404, "Chapter not found")
     assert_pilot_chapter_access(db, chapter_id)
+
+    if limiter.is_rate_limited(
+        user_id=user.id,
+        action="quiz_load",
+        limit_per_minute=settings.rate_limit_quiz_load_minute,
+        limit_per_day=settings.rate_limit_quiz_load_minute * 10,
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Too many quiz requests. Please wait a moment before loading another quiz.",
+        )
     
     if is_pyq or pyq_year or pyq_exam:
         question_count = count

@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Send, X } from "lucide-react";
 import { useSocrates } from "@/components/socrates-context";
-import { api } from "@/lib/api";
+import { api, ApiError } from "@/lib/api";
 
 interface Msg {
   role: "user" | "socrates";
@@ -69,8 +69,20 @@ export function SocratesWidget() {
   const [sending, setSending] = useState(false);
   const [quip, setQuip] = useState(QUIPS[0]);
   const [lastPoweredBy, setLastPoweredBy] = useState<string | null>(null);
+  const [rateLimited, setRateLimited] = useState(false);
+  const [cooldown, setCooldown] = useState(0);
   const scroller = useRef<HTMLDivElement>(null);
   const pendingSent = useRef(false);
+
+  // Cooldown timer for rate limiting
+  useEffect(() => {
+    if (cooldown <= 0) {
+      setRateLimited(false);
+      return;
+    }
+    const t = setTimeout(() => setCooldown((c) => c - 1), 1000);
+    return () => clearTimeout(t);
+  }, [cooldown]);
 
   useEffect(() => {
     const t = setInterval(() => setQuip(QUIPS[Math.floor(Math.random() * QUIPS.length)]), 6000);
@@ -96,7 +108,7 @@ export function SocratesWidget() {
 
   async function send(text: string) {
     const message = text.trim();
-    if (!message || sending) return;
+    if (!message || sending || rateLimited) return;
     setInput("");
     setMessages((m) => [...m, { role: "user", content: message }]);
     setSending(true);
@@ -106,11 +118,23 @@ export function SocratesWidget() {
       setLastPoweredBy(res.powered_by);
       setMessages((m) => [...m, { role: "socrates", content: res.reply, difficulty: res.difficulty, poweredBy: res.powered_by }]);
     } catch (err) {
-      const detail =
-        err instanceof Error && err.message
-          ? err.message
-          : "Cannot reach the server. Check that the backend is running and CORS is configured.";
-      setMessages((m) => [...m, { role: "socrates", content: detail }]);
+      if (err instanceof ApiError && err.status === 429) {
+        setRateLimited(true);
+        setCooldown(60);
+        setMessages((m) => [
+          ...m,
+          {
+            role: "socrates",
+            content: "You've been asking excellent questions — but let's pause for a moment. True understanding needs time to settle. Take a breath, review what we've discussed, and return when you're ready.",
+          },
+        ]);
+      } else {
+        const detail =
+          err instanceof Error && err.message
+            ? err.message
+            : "Cannot reach the server. Check that the backend is running and CORS is configured.";
+        setMessages((m) => [...m, { role: "socrates", content: detail }]);
+      }
     } finally {
       setSending(false);
     }
@@ -305,43 +329,93 @@ export function SocratesWidget() {
                 key={i}
                 className="chip"
                 onClick={() => send(s)}
-                style={{ cursor: "pointer", whiteSpace: "nowrap", flex: "none" }}
+                disabled={rateLimited}
+                style={{
+                  cursor: rateLimited ? "not-allowed" : "pointer",
+                  whiteSpace: "nowrap",
+                  flex: "none",
+                  opacity: rateLimited ? 0.4 : 1,
+                }}
               >
                 {s}
               </button>
             ))}
           </div>
 
-          <div className="lf-row" style={{ flexShrink: 0, gap: 8, padding: "12px 16px 16px" }}>
-            <input
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && input.trim()) send(input.trim());
-              }}
-              placeholder="Answer, or ask why…"
-              style={{
-                flex: 1,
-                background: "var(--surface-3)",
-                border: 0,
+          {rateLimited ? (
+            <div style={{
+              flexShrink: 0,
+              padding: "12px 16px 16px",
+              display: "flex",
+              flexDirection: "column",
+              gap: 6,
+            }}>
+              <div style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                padding: "10px 14px",
                 borderRadius: 10,
-                color: "var(--text)",
-                padding: "11px 14px",
-                fontSize: 14,
-                fontFamily: "var(--font-sans)",
-                outline: "none",
-              }}
-            />
-            <button
-              className="btn btn-solid btn-sm"
-              style={{ height: 40, width: 40, padding: 0 }}
-              aria-label="Send message"
-              disabled={!input.trim() || sending}
-              onClick={() => input.trim() && send(input.trim())}
-            >
-              <Send size={17} />
-            </button>
-          </div>
+                background: "color-mix(in srgb, #fbbf24 10%, var(--surface-3))",
+                border: "1px solid color-mix(in srgb, #fbbf24 25%, transparent)",
+              }}>
+                <span style={{ fontSize: 16 }}>⏳</span>
+                <span style={{
+                  flex: 1,
+                  fontSize: 12,
+                  color: "var(--text-faint)",
+                  fontStyle: "italic",
+                }}>
+                  Socrates will return in {cooldown}s — reflect on what you&apos;ve learned
+                </span>
+              </div>
+              <div style={{
+                height: 3,
+                borderRadius: 99,
+                background: "var(--surface-3)",
+                overflow: "hidden",
+              }}>
+                <div style={{
+                  height: "100%",
+                  width: `${Math.max(0, (cooldown / 60) * 100)}%`,
+                  background: "linear-gradient(90deg, #fbbf24, #f59e0b)",
+                  borderRadius: 99,
+                  transition: "width 1s linear",
+                }} />
+              </div>
+            </div>
+          ) : (
+            <div className="lf-row" style={{ flexShrink: 0, gap: 8, padding: "12px 16px 16px" }}>
+              <input
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && input.trim()) send(input.trim());
+                }}
+                placeholder="Answer, or ask why…"
+                style={{
+                  flex: 1,
+                  background: "var(--surface-3)",
+                  border: 0,
+                  borderRadius: 10,
+                  color: "var(--text)",
+                  padding: "11px 14px",
+                  fontSize: 14,
+                  fontFamily: "var(--font-sans)",
+                  outline: "none",
+                }}
+              />
+              <button
+                className="btn btn-solid btn-sm"
+                style={{ height: 40, width: 40, padding: 0 }}
+                aria-label="Send message"
+                disabled={!input.trim() || sending}
+                onClick={() => input.trim() && send(input.trim())}
+              >
+                <Send size={17} />
+              </button>
+            </div>
+          )}
         </div>
       )}
 
