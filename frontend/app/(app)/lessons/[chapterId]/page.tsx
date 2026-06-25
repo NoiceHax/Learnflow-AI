@@ -204,7 +204,7 @@ export default function LessonPage() {
                     className="rounded border bg-background px-2 py-1 text-sm text-foreground focus:outline-none"
                   >
                     {["All", ...Array.from(new Set(pyqs.map((q) => q.pyq_exam).filter((ex): ex is string => !!ex))).sort()].map((ex) => (
-                      <option key={ex} value={ex}>{ex}</option>
+                      <option key={ex || ""} value={ex || ""}>{ex}</option>
                     ))}
                   </select>
                 </div>
